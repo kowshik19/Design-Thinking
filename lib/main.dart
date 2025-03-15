@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:design_thinking/Home/Home.dart';
+
+import 'package:design_thinking/onboard_screens/s1.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:appwrite/appwrite.dart';
@@ -37,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => Home()),
+        MaterialPageRoute(builder: (context) => S1()),
       );
     });
   }

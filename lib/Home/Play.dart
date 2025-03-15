@@ -80,9 +80,15 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.folder)),
+      backgroundColor: Colors.white,
+      appBar: AppBar(backgroundColor: Colors.white),
       body: Column(
         children: [
+          Text(
+            widget.folder,
+            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: 16),
           if (_controller != null && _controller!.value.isInitialized)
             Padding(
               padding: const EdgeInsets.all(10),

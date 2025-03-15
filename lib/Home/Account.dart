@@ -1,5 +1,6 @@
 import 'package:design_thinking/Home/Account/Certificate.dart';
 import 'package:design_thinking/Home/Account/FAQ.dart';
+import 'package:design_thinking/Home/Account/Logout.dart';
 import 'package:design_thinking/Home/Account/Profile.dart';
 import 'package:design_thinking/Home/Account/Settings.dart';
 import 'package:flutter/material.dart';
@@ -15,9 +16,9 @@ class _AccountState extends State<Account> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xffF4F5F9),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xffF4F5F9),
+        backgroundColor: Colors.white,
         title: Text(
           'Account',
           style: const TextStyle(
@@ -45,7 +46,7 @@ class _AccountState extends State<Account> {
           SizedBox(height: 5),
           element_1("FAQ’s", FAQ()),
           SizedBox(height: 5),
-          element_1("Logout", Account()),
+          element_1("Logout", LogoutScreen()),
         ],
       ),
     );

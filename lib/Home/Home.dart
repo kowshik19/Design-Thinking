@@ -13,29 +13,37 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   int _currentIndex = 0;
-
-  final List<Widget> _pages = [
-    HomeScreen(),
-    VideoPlayScreen(folder: "Flutter Basics"),
-    Account(),
-  ];
+  String selectedFolder = ""; // Store selected module name
 
   @override
   Widget build(BuildContext context) {
+    // Pages update dynamically when switching tabs
+    final List<Widget> _pages = [
+      HomeScreen(
+        onModuleTap: (folder) {
+          setState(() {
+            selectedFolder = folder;
+            _currentIndex = 1; // Switch to PlayScreen
+          });
+        },
+      ),
+      VideoPlayScreen(folder: selectedFolder), // Pass selected folder name
+      Account(),
+    ];
+
     return Scaffold(
-      body: _pages[_currentIndex], // Show the selected screen
+      backgroundColor: Colors.white,
+      body: _pages[_currentIndex], // Show selected screen
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10),
         child: GNav(
           tabBorderRadius: 50,
-          gap: 8, // Spacing between icon and text
-          color: Colors.black, // Inactive icon color
-          activeColor: Colors.white, // Active icon color
-          iconSize: 0, // Hide default icon to use custom PNG
+          gap: 8,
+          color: Colors.black,
+          activeColor: Colors.white,
+          iconSize: 0,
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          tabBackgroundColor: Color(
-            0xff75DBCE,
-          ), // Selected tab background color
+          tabBackgroundColor: Color(0xff75DBCE),
           tabs: [
             GButton(
               leading: Image.asset(
@@ -51,17 +59,14 @@ class _HomeState extends State<Home> {
                 width: 24,
                 height: 24,
               ),
-              // text: 'Search',
               icon: Icons.abc,
             ),
-
             GButton(
               leading: Image.asset(
                 'assets/Nav/Profile.png',
                 width: 24,
                 height: 24,
               ),
-              // text: 'Profile',
               icon: Icons.abc,
             ),
           ],
