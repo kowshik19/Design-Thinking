@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:design_thinking/Login_screens/otp.dart';
 import 'package:design_thinking/Login_screens/login.dart'; // Added Import
 
 class Signup extends StatefulWidget {

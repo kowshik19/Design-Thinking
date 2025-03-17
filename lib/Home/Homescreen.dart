@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:appwrite/appwrite.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(String) onModuleTap;
@@ -11,19 +12,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
-  final Client client = Client();
-  late Databases databases;
   late TabController _tabController;
-
-  List<String> module = [
-    "Flutter Basics",
-    "Dart Fundamentals",
-    "State Management",
-    "Navigation & Routing",
-    "UI Components",
-    "Animations",
-    "Networking & API Calls",
-    "Firebase Integration",
+  String userName = "User"; // Default value
+  List<String> modules = [
+    "What is Design Thinking",
+    "Empathize",
+    "Define ",
+    "Ideate",
+    "Prototype",
   ];
   List<String> ongoing = [];
   List<String> completed = [];
@@ -31,56 +27,73 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _initializeAppwrite();
-    fetchOngoingModules();
-
-    // Initialize TabController with 3 tabs
     _tabController = TabController(length: 3, vsync: this);
+    fetchUserName();
+    fetchOngoingModules();
   }
 
   @override
   void dispose() {
-    _tabController.dispose(); // Dispose of the TabController
+    _tabController.dispose();
     super.dispose();
   }
 
-  void _initializeAppwrite() {
-    client
-        .setEndpoint(
-          'https://cloud.appwrite.io/v1',
-        ) // Replace with your endpoint
-        .setProject('67d037a100204739d319'); // Replace with your project ID
+  Future<void> fetchUserName() async {
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
-    databases = Databases(client);
+      setState(() {
+        userName = userDoc['firstName'] ?? 'User'; // Ensure proper fallback
+      });
+    } catch (e) {
+      print("Error fetching user name: $e");
+    }
   }
 
   Future<void> fetchOngoingModules() async {
     try {
-      final response = await databases.listDocuments(
-        databaseId: '67d04ae6000e6892010c', // Replace with your database ID
-        collectionId: '67d04af400016ead69d3', // Replace with your collection ID
-      );
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      QuerySnapshot querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('ongoingModules')
+              .get();
 
       setState(() {
         ongoing =
-            response.documents
-                .map((doc) => doc.data['name'].toString())
+            querySnapshot.docs
+                .map(
+                  (doc) => doc['name'].toString(),
+                ) // Ensure correct field name
                 .toList();
       });
     } catch (e) {
-      print("Error fetching data: $e");
+      print("Error fetching ongoing modules: $e");
     }
   }
 
   Future<void> addToOngoing(String moduleName) async {
     try {
-      await databases.createDocument(
-        databaseId: '67d04ae6000e6892010c',
-        collectionId: '67d04af400016ead69d3',
-        documentId: ID.unique(),
-        data: {'name': moduleName},
-      );
-      fetchOngoingModules(); // Refresh the list
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      CollectionReference ongoingCollection = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('ongoingModules');
+
+      // Check if the module already exists
+      QuerySnapshot existingModules =
+          await ongoingCollection.where('name', isEqualTo: moduleName).get();
+
+      if (existingModules.docs.isEmpty) {
+        // Add only if it doesn't already exist
+        await ongoingCollection.add({'name': moduleName});
+        fetchOngoingModules(); // Refresh list
+      } else {
+        print("Module already exists in ongoing list.");
+      }
     } catch (e) {
       print("Error adding module: $e");
     }
@@ -107,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Row(
                     children: [
                       Text(
-                        'Hi, Amar 👋',
+                        'Hi, $userName 👋',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -147,8 +160,7 @@ class _HomeScreenState extends State<HomeScreen>
                 tabBarTheme: TabBarTheme(dividerColor: Colors.transparent),
               ),
               child: TabBar(
-                controller:
-                    _tabController, // Using manually controlled TabController
+                controller: _tabController,
                 indicatorColor: Color(0xffE8505B),
                 labelColor: Colors.black,
                 unselectedLabelColor: Colors.grey,
@@ -165,14 +177,14 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             Expanded(
               child: TabBarView(
-                controller: _tabController, // Manually controlled TabController
+                controller: _tabController,
                 children: [
                   ListView.builder(
-                    itemCount: module.length,
+                    itemCount: modules.length,
                     itemBuilder: (context, index) {
                       return ListTile(
                         title: Text(
-                          module[index],
+                          modules[index],
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -180,8 +192,8 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                         trailing: Icon(Icons.play_circle, color: Colors.green),
                         onTap: () {
-                          addToOngoing(module[index]);
-                          widget.onModuleTap(module[index]);
+                          addToOngoing(modules[index]);
+                          widget.onModuleTap(modules[index]);
                         },
                       );
                     },
@@ -203,9 +215,6 @@ class _HomeScreenState extends State<HomeScreen>
                               Icons.play_circle,
                               color: Colors.green,
                             ),
-                            onTap: () {
-                              // Handle tap action for ongoing modules
-                            },
                           );
                         },
                       ),
@@ -220,9 +229,6 @@ class _HomeScreenState extends State<HomeScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        onTap: () {
-                          // Handle tap action for completed modules
-                        },
                       );
                     },
                   ),

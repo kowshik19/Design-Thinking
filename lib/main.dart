@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:appwrite/appwrite.dart';
+import 'package:design_thinking/firebase/auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:design_thinking/onboard_screens/s1.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  Client client = Client();
+  client.setProject('67d037a100204739d319');
   runApp(MyApp());
 }
 
@@ -37,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => S1()),
+        MaterialPageRoute(builder: (context) => AuthGate()),
       );
     });
   }

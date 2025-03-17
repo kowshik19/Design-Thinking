@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:appwrite/appwrite.dart';
@@ -17,63 +20,43 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   late Client client;
   late Storage storage;
 
-  // Dummy Appwrite File IDs (Replace with actual file IDs from Appwrite)
   Map<String, String> flutterVideos = {
-    "Flutter Introduction": "67d03b4c0007fd85311b",
-    "State Management": "chapter_1",
-  };
-
-  Map<String, String> dartVideos = {
-    "Dart Basics": "your_file_id_3",
-    "Asynchronous Programming": "your_file_id_4",
+    "What is Design Thinking": "67d7ce26000d3520ae8a",
+    "Empathize": "67d7ce9d003ac9672d11",
+    "Define": "67d7ceb000105e38c7b8",
+    "Ideate": "67d7ceb8003ae649eb81",
+    "Prototype": "67d7cec800034d71269b",
+    "Test": "67d7cecf00125a2cdb53",
   };
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize Appwrite Client and Storage
-    client =
-        Client()
-          ..setEndpoint(
-            "https://cloud.appwrite.io/v1",
-          ) // Your Appwrite endpoint
-          ..setProject("67d037a100204739d319"); // Your Appwrite project ID
-
+    client = Client()
+        .setEndpoint("https://cloud.appwrite.io/v1")
+        .setProject("67d037a100204739d319");
     storage = Storage(client);
-
-    if (widget.folder == "Flutter Basics") {
-      selectedVideos = flutterVideos.keys.toList();
-    } else if (widget.folder == "Dart Fundamentals") {
-      selectedVideos = dartVideos.keys.toList();
-    }
   }
 
-  Future<void> loadVideo(String fileId) async {
+  Future<void> fetchVideoUrl(String fileId) async {
     try {
-      final response = await storage.getFileView(
-        bucketId: "67d039f800168f252c0c",
+      final Uint8List response = await storage.getFileView(
+        bucketId: '67d039f800168f252c0c',
         fileId: fileId,
       );
 
-      // Convert Uint8List to a data URI
-      final videoBytes = await response;
-      final videoUri =
-          Uri.dataFromBytes(videoBytes, mimeType: "video/mp4").toString();
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/video.mp4');
+      await file.writeAsBytes(response);
 
       setState(() {
-        videoUrl = videoUri;
-        _controller?.dispose();
-        _controller = VideoPlayerController.network(videoUrl)
+        _controller = VideoPlayerController.file(file)
           ..initialize().then((_) {
             setState(() {});
           });
       });
     } catch (e) {
-      print("Error loading video: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to load video")));
+      print("Error fetching video: $e");
     }
   }
 
@@ -124,7 +107,9 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                   ],
                 ),
               ),
-            ),
+            )
+          else
+            CircularProgressIndicator(),
           SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -132,11 +117,9 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
               IconButton(
                 icon: Icon(Icons.replay_10, size: 30, color: Colors.grey),
                 onPressed: () {
-                  if (_controller != null) {
-                    _controller!.seekTo(
-                      _controller!.value.position - Duration(seconds: 10),
-                    );
-                  }
+                  _controller?.seekTo(
+                    _controller!.value.position - Duration(seconds: 10),
+                  );
                 },
               ),
               IconButton(
@@ -148,23 +131,19 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                   color: Colors.green,
                 ),
                 onPressed: () {
-                  if (_controller != null) {
-                    setState(() {
-                      _controller!.value.isPlaying
-                          ? _controller!.pause()
-                          : _controller!.play();
-                    });
-                  }
+                  setState(() {
+                    _controller!.value.isPlaying
+                        ? _controller!.pause()
+                        : _controller!.play();
+                  });
                 },
               ),
               IconButton(
                 icon: Icon(Icons.forward_10, size: 30, color: Colors.grey),
                 onPressed: () {
-                  if (_controller != null) {
-                    _controller!.seekTo(
-                      _controller!.value.position + Duration(seconds: 10),
-                    );
-                  }
+                  _controller?.seekTo(
+                    _controller!.value.position + Duration(seconds: 10),
+                  );
                 },
               ),
             ],
@@ -202,13 +181,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                                 Icons.play_arrow,
                                 color: Colors.green,
                               ),
-                              onTap: () {
-                                String fileId =
-                                    widget.folder == "Flutter Basics"
-                                        ? flutterVideos[selectedVideos[index]]!
-                                        : dartVideos[selectedVideos[index]]!;
-                                loadVideo(fileId);
-                              },
+                              onTap: () {},
                             ),
                           ),
                         );
@@ -237,6 +210,8 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   }
 }
 
+extension on Uint8List {}
+
 class FullScreenVideo extends StatelessWidget {
   final VideoPlayerController controller;
   const FullScreenVideo({super.key, required this.controller});
@@ -248,11 +223,7 @@ class FullScreenVideo extends StatelessWidget {
       body: Center(
         child: GestureDetector(
           onTap: () {
-            if (controller.value.isPlaying) {
-              controller.pause();
-            } else {
-              controller.play();
-            }
+            controller.value.isPlaying ? controller.pause() : controller.play();
           },
           child: AspectRatio(
             aspectRatio: controller.value.aspectRatio,
