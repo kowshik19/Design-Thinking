@@ -1,3 +1,4 @@
+import 'package:design_thinking/Login_screens/login.dart';
 import 'package:flutter/material.dart';
 
 class LogoutScreen extends StatelessWidget {
@@ -52,11 +53,10 @@ class LogoutScreen extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () {
                       // Perform logout action here
-                      Navigator.pop(context); // Close dialog
-                      Navigator.pushReplacementNamed(
+                      Navigator.push(
                         context,
-                        '/login',
-                      ); // Navigate to login screen
+                        MaterialPageRoute(builder: (context) => Login()),
+                      ); // Close dialog/ Navigate to login screen
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xff75DBCE),

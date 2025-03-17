@@ -16,7 +16,7 @@ class _OTPState extends State<OTP> {
     double screenHeight = MediaQuery.of(context).size.height;
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(backgroundColor: Colors.white),
+      appBar: AppBar(backgroundColor: Colors.white, title: Text("")),
       body: Padding(
         padding: const EdgeInsets.all(18.0),
         child: Column(

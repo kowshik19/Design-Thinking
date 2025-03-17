@@ -1,13 +1,12 @@
 import 'dart:async';
-
+import 'package:firebase_core/firebase_core.dart';
 import 'package:design_thinking/onboard_screens/s1.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:appwrite/appwrite.dart';
 
-void main() {
-  Client client = Client();
-  client.setProject('67d037a100204739d319');
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 

@@ -1,7 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/Login_screens/Forgot_password.dart';
 import 'package:design_thinking/Login_screens/signup.dart';
-import 'package:flutter/material.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -11,32 +12,57 @@ class Login extends StatefulWidget {
 }
 
 class _LoginState extends State<Login> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  Future<void> _login() async {
+    try {
+      await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => Home()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login Failed: ${e.toString()}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xffF4F5F9),
+      backgroundColor: const Color(0xffF4F5F9),
       body: Padding(
         padding: const EdgeInsets.all(18.0),
         child: SingleChildScrollView(
           child: Column(
             children: [
-              SizedBox(height: 15),
+              const SizedBox(height: 15),
               Image.asset('assets/login_img.png'),
-              SizedBox(height: 15),
-              Text(
-                'Hey Champ👋, \nLet’s Step into Your Zone ',
+              const SizedBox(height: 15),
+              const Text(
+                'Hey Champ👋, \nLet’s Step into Your Zone',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 35),
+              const SizedBox(height: 35),
               _buildLabel('Email'),
-              SizedBox(height: 8),
-              _buildTextField(hint: 'name@example.com'),
-              SizedBox(height: 25),
-              _buildLabel('Password'),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _buildTextField(
+                controller: _emailController,
+                hint: 'name@example.com',
+              ),
+              const SizedBox(height: 25),
+              _buildLabel('Password'),
+              const SizedBox(height: 8),
+              _buildTextField(
+                controller: _passwordController,
                 hint: '********',
                 obscureText: _obscurePassword,
                 suffixIcon: IconButton(
@@ -50,19 +76,18 @@ class _LoginState extends State<Login> {
                   },
                 ),
               ),
-
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
-                    Navigator.pushReplacement(
+                    Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => ForgotPassword()),
                     );
                   },
                   child: const Text(
-                    'Forget password?',
+                    'Forgot password?',
                     style: TextStyle(
                       color: Colors.blue,
                       fontSize: 18,
@@ -71,17 +96,12 @@ class _LoginState extends State<Login> {
                   ),
                 ),
               ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               SizedBox(
                 height: 60,
                 width: 265,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => Home()),
-                    );
-                  },
+                  onPressed: _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xff75DBCE),
                     foregroundColor: Colors.black,
@@ -89,20 +109,20 @@ class _LoginState extends State<Login> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: Text('Login', style: TextStyle(fontSize: 20)),
+                  child: const Text('Login', style: TextStyle(fontSize: 20)),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Don’t Have an account ?',
+                    'Don’t Have an account?',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
                   ),
                   TextButton(
                     onPressed: () {
-                      Navigator.pushReplacement(
+                      Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => Signup()),
                       );
@@ -137,6 +157,7 @@ Widget _buildLabel(String text) {
 }
 
 Widget _buildTextField({
+  required TextEditingController controller,
   required String hint,
   bool obscureText = false,
   Widget? suffixIcon,
@@ -154,6 +175,7 @@ Widget _buildTextField({
       ],
     ),
     child: TextField(
+      controller: controller,
       obscureText: obscureText,
       decoration: InputDecoration(
         fillColor: Colors.white,
