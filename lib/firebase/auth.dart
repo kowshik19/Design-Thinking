@@ -1,5 +1,5 @@
 import 'package:design_thinking/Home/Home.dart';
-import 'package:design_thinking/Login_screens/login.dart';
+import 'package:design_thinking/onboard_screens/s1.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -27,7 +27,7 @@ class AuthGate extends StatelessWidget {
           return const Home();
         } else {
           // No user logged in, show LoginScreen
-          return const Login();
+          return const S1();
         }
       },
     );

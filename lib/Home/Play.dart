@@ -15,11 +15,8 @@ class VideoPlayScreen extends StatefulWidget {
 
 class _VideoPlayScreenState extends State<VideoPlayScreen> {
   VideoPlayerController? _controller;
-  String videoUrl = "";
-  List<String> selectedVideos = [];
   late Client client;
   late Storage storage;
-
   Map<String, String> flutterVideos = {
     "What is Design Thinking": "67d7ce26000d3520ae8a",
     "Empathize": "67d7ce9d003ac9672d11",
@@ -33,28 +30,46 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   void initState() {
     super.initState();
     client = Client()
-        .setEndpoint("https://cloud.appwrite.io/v1")
+        .setEndpoint('https://cloud.appwrite.io/v1')
         .setProject("67d037a100204739d319");
     storage = Storage(client);
+
+    fetchVideoUrl(); // <-- Fetch video when screen loads
   }
 
-  Future<void> fetchVideoUrl(String fileId) async {
+  Future<void> fetchVideoUrl() async {
     try {
+      print("Fetching video from Appwrite...");
+
+      // Ensure fileId is retrieved correctly
+      String? fileId = flutterVideos[widget.folder];
+      if (fileId == null) {
+        print("Error: No file ID found for ${widget.folder}");
+        return;
+      }
+
       final Uint8List response = await storage.getFileView(
         bucketId: '67d039f800168f252c0c',
         fileId: fileId,
       );
 
+      print("Video fetched successfully! Writing to temporary storage...");
+
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/video.mp4');
       await file.writeAsBytes(response);
 
-      setState(() {
-        _controller = VideoPlayerController.file(file)
-          ..initialize().then((_) {
-            setState(() {});
-          });
-      });
+      print("File written successfully at: ${file.path}");
+
+      _controller = VideoPlayerController.file(file)
+        ..initialize()
+            .then((_) {
+              print("Video initialized successfully.");
+              setState(() {});
+            })
+            .catchError((error) {
+              print("Error initializing video: $error");
+            });
     } catch (e) {
       print("Error fetching video: $e");
     }
@@ -109,14 +124,25 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
               ),
             )
           else
-            CircularProgressIndicator(),
+            CircularProgressIndicator(), // Show loading while fetching video
+
           SizedBox(height: 10),
+
+          /// Playback Controls
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
                 icon: Icon(Icons.replay_10, size: 30, color: Colors.grey),
                 onPressed: () {
+                  if (_controller == null ||
+                      !_controller!.value.isInitialized) {
+                    print(
+                      "Error: Video controller is null or not initialized.",
+                    );
+                    return;
+                  }
+                  print("Seeking backward...");
                   _controller?.seekTo(
                     _controller!.value.position - Duration(seconds: 10),
                   );
@@ -131,16 +157,37 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                   color: Colors.green,
                 ),
                 onPressed: () {
+                  if (_controller == null) {
+                    print("Error: Video controller is null.");
+                    return;
+                  }
+                  if (!_controller!.value.isInitialized) {
+                    print("Error: Video controller is not initialized.");
+                    return;
+                  }
+
                   setState(() {
-                    _controller!.value.isPlaying
-                        ? _controller!.pause()
-                        : _controller!.play();
+                    if (_controller!.value.isPlaying) {
+                      print("Pausing video...");
+                      _controller!.pause();
+                    } else {
+                      print("Playing video...");
+                      _controller!.play();
+                    }
                   });
                 },
               ),
               IconButton(
                 icon: Icon(Icons.forward_10, size: 30, color: Colors.grey),
                 onPressed: () {
+                  if (_controller == null ||
+                      !_controller!.value.isInitialized) {
+                    print(
+                      "Error: Video controller is null or not initialized.",
+                    );
+                    return;
+                  }
+                  print("Seeking forward...");
                   _controller?.seekTo(
                     _controller!.value.position + Duration(seconds: 10),
                   );
@@ -149,55 +196,6 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
             ],
           ),
           SizedBox(height: 10),
-          Expanded(
-            child:
-                selectedVideos.isNotEmpty
-                    ? ListView.builder(
-                      itemCount: selectedVideos.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 15,
-                            vertical: 5,
-                          ),
-                          child: Card(
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              title: Text(
-                                selectedVideos[index],
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              leading: Icon(
-                                Icons.video_library,
-                                color: Colors.green,
-                              ),
-                              trailing: Icon(
-                                Icons.play_arrow,
-                                color: Colors.green,
-                              ),
-                              onTap: () {},
-                            ),
-                          ),
-                        );
-                      },
-                    )
-                    : Center(
-                      child: Text(
-                        "No videos available",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-          ),
         ],
       ),
     );
@@ -210,8 +208,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   }
 }
 
-extension on Uint8List {}
-
+/// Full-screen video player
 class FullScreenVideo extends StatelessWidget {
   final VideoPlayerController controller;
   const FullScreenVideo({super.key, required this.controller});
@@ -223,7 +220,13 @@ class FullScreenVideo extends StatelessWidget {
       body: Center(
         child: GestureDetector(
           onTap: () {
-            controller.value.isPlaying ? controller.pause() : controller.play();
+            if (controller.value.isPlaying) {
+              print("Pausing full-screen video...");
+              controller.pause();
+            } else {
+              print("Playing full-screen video...");
+              controller.play();
+            }
           },
           child: AspectRatio(
             aspectRatio: controller.value.aspectRatio,

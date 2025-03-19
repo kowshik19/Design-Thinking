@@ -17,9 +17,10 @@ class _HomeScreenState extends State<HomeScreen>
   List<String> modules = [
     "What is Design Thinking",
     "Empathize",
-    "Define ",
+    "Define",
     "Ideate",
     "Prototype",
+    "Test",
   ];
   List<String> ongoing = [];
   List<String> completed = [];
@@ -215,6 +216,9 @@ class _HomeScreenState extends State<HomeScreen>
                               Icons.play_circle,
                               color: Colors.green,
                             ),
+                            onTap: () {
+                              widget.onModuleTap(ongoing[index]);
+                            },
                           );
                         },
                       ),

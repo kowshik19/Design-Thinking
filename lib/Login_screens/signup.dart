@@ -65,17 +65,14 @@ class _SignupState extends State<Signup> {
               child: Column(
                 children: [
                   SizedBox(height: screenHeight * 0.05),
-                  Image.asset(
-                    'assets/login_img1.png',
-                    width: screenWidth * 0.6,
-                  ),
+                  Image.asset('assets/login_img1.png', height: 200),
                   SizedBox(height: screenHeight * 0.02),
                   const Text(
                     'Hey Champ👋,\nLet’s Create Your Account ',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: screenHeight * 0.03),
+                  SizedBox(height: screenHeight * 0.01),
 
                   // Name Fields
                   _buildLabel('Name'),
@@ -149,7 +146,7 @@ class _SignupState extends State<Signup> {
                     ),
                   ),
 
-                  SizedBox(height: screenHeight * 0.02),
+                  SizedBox(height: screenHeight * 0.01),
 
                   // Login Link
                   Row(
@@ -175,7 +172,7 @@ class _SignupState extends State<Signup> {
                           'Login',
                           style: TextStyle(
                             color: Colors.blue,
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w400,
                           ),
                         ),

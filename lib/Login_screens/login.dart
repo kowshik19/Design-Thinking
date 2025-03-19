@@ -44,23 +44,23 @@ class _LoginState extends State<Login> {
           child: Column(
             children: [
               const SizedBox(height: 15),
-              Image.asset('assets/login_img.png'),
-              const SizedBox(height: 15),
+              Image.asset('assets/login_img.png', height: 200),
+              const SizedBox(height: 12),
               const Text(
                 'Hey Champ👋, \nLet’s Step into Your Zone',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 35),
+              const SizedBox(height: 25),
               _buildLabel('Email'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _buildTextField(
                 controller: _emailController,
                 hint: 'name@example.com',
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 15),
               _buildLabel('Password'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _buildTextField(
                 controller: _passwordController,
                 hint: '********',
@@ -96,7 +96,7 @@ class _LoginState extends State<Login> {
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 12),
               SizedBox(
                 height: 60,
                 width: 265,
@@ -112,31 +112,36 @@ class _LoginState extends State<Login> {
                   child: const Text('Login', style: TextStyle(fontSize: 20)),
                 ),
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Don’t Have an account?',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => Signup()),
-                      );
-                    },
-                    child: const Text(
-                      'Signup',
+              const SizedBox(height: 15),
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Don’t Have an account?',
                       style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                  ),
-                ],
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => Signup()),
+                        );
+                      },
+                      child: const Text(
+                        'Signup',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
