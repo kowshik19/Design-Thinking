@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter/services.dart' show rootBundle;
@@ -15,18 +17,41 @@ class CertificateGenerator extends StatefulWidget {
 
 class _CertificateGeneratorState extends State<CertificateGenerator> {
   String? _certificatePath;
-  final TextEditingController _nameController = TextEditingController();
+  String? _userName;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserName();
+  }
+
+  Future<void> _fetchUserName() async {
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      setState(() {
+        _userName = userDoc['firstName'] ?? 'User';
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error fetching user name: $e");
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _generateCertificate() async {
-    String userName = _nameController.text.trim();
-    if (userName.isEmpty) {
+    if (_userName == null || _userName!.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Please enter a name")));
+      ).showSnackBar(const SnackBar(content: Text("User name not found!")));
       return;
     }
 
-    // Load the certificate template
     ByteData data = await rootBundle.load("assets/template.png");
     Uint8List bytes = data.buffer.asUint8List();
     img.Image? image = img.decodeImage(bytes);
@@ -38,13 +63,17 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       return;
     }
 
-    // Define text color and font
-    img.drawString(image, font: img.arial48, x: 400, y: 500, userName);
+    img.drawString(
+      image,
+      _userName!,
+      font: img.arial48, // Specify font
+      x: 100,
+      y: 100,
+      color: img.ColorFloat16.rgb(0, 0, 0), // Set text color to black
+    );
 
-    // Convert image to PNG
     Uint8List outputBytes = Uint8List.fromList(img.encodePng(image));
 
-    // Save the image to local storage
     Directory directory = await getApplicationDocumentsDirectory();
     String path = "${directory.path}/Generated_Certificate.png";
     File file = File(path);
@@ -58,35 +87,86 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       context,
     ).showSnackBar(SnackBar(content: Text("Certificate saved to: $path")));
 
-    // Open the generated certificate
     OpenFile.open(path);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Certificate Generator")),
+      appBar: AppBar(centerTitle: true),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: "Enter your name",
-                border: OutlineInputBorder(),
+            _isLoading
+                ? const CircularProgressIndicator()
+                : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Align(
+                        child: const Text(
+                          "Click the below button to generate certificate",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+            SizedBox(
+              height: 60,
+              width: 265,
+              child: ElevatedButton(
+                onPressed: _generateCertificate,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff75DBCE),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('Generate', style: TextStyle(fontSize: 20)),
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _generateCertificate,
-              child: const Text("Generate Certificate"),
-            ),
-            const SizedBox(height: 20),
             if (_certificatePath != null)
-              Text(
-                "Saved at: $_certificatePath",
-                style: const TextStyle(fontSize: 16),
+              Card(
+                color: Colors.green[50],
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 30,
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        "Certificate Generated!",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        "Saved at: $_certificatePath",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
               ),
           ],
         ),

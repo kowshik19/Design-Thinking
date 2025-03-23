@@ -1,5 +1,6 @@
-import 'package:design_thinking/Login_screens/login.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:design_thinking/Login_screens/login.dart';
 
 class ForgotPassword extends StatefulWidget {
   const ForgotPassword({super.key});
@@ -9,49 +10,76 @@ class ForgotPassword extends StatefulWidget {
 }
 
 class _ForgotPasswordState extends State<ForgotPassword> {
+  final TextEditingController _emailController = TextEditingController();
+
+  Future<void> resetPassword() async {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Password reset link sent! Check your email.',
+            style: TextStyle(color: Colors.green),
+          ),
+        ),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => Login()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     double screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(backgroundColor: Colors.white),
       body: Padding(
         padding: const EdgeInsets.all(18.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Forget Password ?",
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 25),
-              ),
+            Text(
+              "Forgot Password?",
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 25),
             ),
             SizedBox(height: 20),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Confirm the email to send password reset Link . . . . . . . . . . . . . .',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
-                  color: Color(0xff636D77),
-                ),
+            Text(
+              'Enter your email to receive a password reset link.',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 16,
+                color: Color(0xff636D77),
               ),
             ),
-            SizedBox(height: 80),
+            SizedBox(height: 40),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email),
+              ),
+            ),
+            SizedBox(height: 30),
             SizedBox(
               height: screenHeight * 0.07,
               width: screenWidth * 0.6,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => Login()),
-                  );
-                },
+                onPressed: resetPassword,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff75DBCE),
+                  backgroundColor: Color(0xff75DBCE),
                   foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -63,7 +91,6 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                 ),
               ),
             ),
-            SizedBox(height: 20),
           ],
         ),
       ),

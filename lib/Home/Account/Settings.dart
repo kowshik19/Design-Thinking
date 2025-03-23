@@ -1,4 +1,5 @@
 import 'package:design_thinking/Home/Account/AboutUs.dart';
+import 'package:design_thinking/Login_screens/Forgot_password.dart';
 import 'package:flutter/material.dart';
 
 class Settings extends StatefulWidget {
@@ -27,7 +28,7 @@ class _SettingsState extends State<Settings> {
       body: Column(
         children: [
           const SizedBox(height: 30),
-          element_1(context, "Reset Password"),
+          element_1(context, "Reset Password", screen: ForgotPassword()),
           element_1(context, "About Us", screen: AboutUsPage()),
         ],
       ),
