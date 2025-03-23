@@ -13,6 +13,8 @@ class Account extends StatefulWidget {
   State<Account> createState() => _AccountState();
 }
 
+String username = "";
+
 class _AccountState extends State<Account> {
   @override
   Widget build(BuildContext context) {
@@ -46,9 +48,8 @@ class _AccountState extends State<Account> {
                     ),
                   ),
                 ),
-                SizedBox(
-                  height: constraints.maxHeight * 0.05,
-                ), // 5% of screen height
+                SizedBox(height: constraints.maxHeight * 0.05),
+                Text(username),
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.symmetric(
