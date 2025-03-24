@@ -24,13 +24,14 @@ class _HomeScreenState extends State<HomeScreen>
   ];
   List<String> ongoing = [];
   List<String> completed = [];
-
+  late bool progress = false;
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     fetchUserName();
     fetchOngoingModules();
+    fetchCompletedModules();
   }
 
   @override
@@ -65,14 +66,29 @@ class _HomeScreenState extends State<HomeScreen>
 
       setState(() {
         ongoing =
-            querySnapshot.docs
-                .map(
-                  (doc) => doc['name'].toString(),
-                ) // Ensure correct field name
-                .toList();
+            querySnapshot.docs.map((doc) => doc['name'].toString()).toList();
       });
     } catch (e) {
       print("Error fetching ongoing modules: $e");
+    }
+  }
+
+  Future<void> fetchCompletedModules() async {
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      QuerySnapshot querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('completedModules')
+              .get();
+
+      setState(() {
+        completed =
+            querySnapshot.docs.map((doc) => doc['name'].toString()).toList();
+      });
+    } catch (e) {
+      print("Error fetching completed modules: $e");
     }
   }
 
@@ -97,6 +113,45 @@ class _HomeScreenState extends State<HomeScreen>
       }
     } catch (e) {
       print("Error adding module: $e");
+    }
+  }
+
+  Future<void> markAsCompleted(String moduleName) async {
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      CollectionReference completedCollection = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('completedModules');
+
+      // Check if the module is already in the completed list
+      QuerySnapshot existingModules =
+          await completedCollection.where('name', isEqualTo: moduleName).get();
+
+      if (existingModules.docs.isEmpty) {
+        // Add to completed list
+        await completedCollection.add({'name': moduleName});
+
+        // Remove from ongoing list
+        QuerySnapshot ongoingModulesSnapshot =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .collection('ongoingModules')
+                .where('name', isEqualTo: moduleName)
+                .get();
+
+        for (var doc in ongoingModulesSnapshot.docs) {
+          await doc.reference.delete();
+        }
+
+        fetchOngoingModules();
+        fetchCompletedModules();
+      } else {
+        print("Module already exists in completed list.");
+      }
+    } catch (e) {
+      print("Error marking module as completed: $e");
     }
   }
 
@@ -147,7 +202,54 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             SizedBox(height: 20),
-            Image.asset('assets/HomeScreen_img1.png', scale: 0.1),
+            progress
+                ? Image.asset('assets/HomeScreen_img1.png')
+                : Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Color(0xffA8E8F9),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Overall Mastery',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Image.asset('assets/star.png'),
+                          ],
+                        ),
+                        Text(
+                          'Unlock your greatness',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        LinearProgressIndicator(
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(8),
+                          value: completed.length / 6,
+                          color: Color(0xff8DF13F),
+                          backgroundColor: Colors.grey,
+                        ),
+                        SizedBox(height: 12),
+                        Image.asset('assets/star.png'),
+                      ],
+                    ),
+                  ),
+                  height: 130,
+                  width: 333,
+                ),
             SizedBox(height: 20),
             Align(
               alignment: Alignment.centerLeft,
@@ -161,6 +263,13 @@ class _HomeScreenState extends State<HomeScreen>
                 tabBarTheme: TabBarTheme(dividerColor: Colors.transparent),
               ),
               child: TabBar(
+                onTap: (index) {
+                  setState(() {
+                    progress =
+                        (index == 0); // Show progress only in "Modules" tab
+                  });
+                },
+
                 controller: _tabController,
                 indicatorColor: Color(0xffE8505B),
                 labelColor: Colors.black,
@@ -191,37 +300,35 @@ class _HomeScreenState extends State<HomeScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        trailing: Icon(Icons.play_circle, color: Colors.green),
+                        trailing: Icon(Icons.play_circle, color: Colors.grey),
                         onTap: () {
                           addToOngoing(modules[index]);
                           widget.onModuleTap(modules[index]);
+                          setState(() {});
                         },
                       );
                     },
                   ),
-                  ongoing.isEmpty
-                      ? Center(child: CircularProgressIndicator())
-                      : ListView.builder(
-                        itemCount: ongoing.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            title: Text(
-                              ongoing[index],
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            trailing: Icon(
-                              Icons.play_circle,
-                              color: Colors.green,
-                            ),
-                            onTap: () {
-                              widget.onModuleTap(ongoing[index]);
-                            },
-                          );
+                  ListView.builder(
+                    itemCount: ongoing.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        title: Text(
+                          ongoing[index],
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        trailing: Icon(Icons.play_circle, color: Colors.green),
+                        onTap: () {
+                          markAsCompleted(ongoing[index]);
+                          widget.onModuleTap(ongoing[index]);
+                          setState(() {});
                         },
-                      ),
+                      );
+                    },
+                  ),
                   ListView.builder(
                     itemCount: completed.length,
                     itemBuilder: (context, index) {
@@ -233,6 +340,7 @@ class _HomeScreenState extends State<HomeScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        trailing: Icon(Icons.check_circle, color: Colors.blue),
                       );
                     },
                   ),

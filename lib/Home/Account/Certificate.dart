@@ -66,10 +66,10 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
     img.drawString(
       image,
       _userName!,
-      font: img.arial48, // Specify font
+      font: img.arial14,
       x: 100,
       y: 100,
-      color: img.ColorFloat16.rgb(0, 0, 0), // Set text color to black
+      color: img.ColorFloat16.rgb(0, 0, 0),
     );
 
     Uint8List outputBytes = Uint8List.fromList(img.encodePng(image));
