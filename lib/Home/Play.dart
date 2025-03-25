@@ -33,43 +33,25 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
         .setEndpoint('https://cloud.appwrite.io/v1')
         .setProject("67d037a100204739d319");
     storage = Storage(client);
-
-    fetchVideoUrl(); // <-- Fetch video when screen loads
+    fetchVideoUrl();
   }
 
   Future<void> fetchVideoUrl() async {
     try {
-      print("Fetching video from Appwrite...");
-
-      // Ensure fileId is retrieved correctly
       String? fileId = flutterVideos[widget.folder];
-      if (fileId == null) {
-        print("Error: No file ID found for ${widget.folder}");
-        return;
-      }
+      if (fileId == null) return;
 
       final Uint8List response = await storage.getFileView(
         bucketId: '67d039f800168f252c0c',
         fileId: fileId,
       );
 
-      print("Video fetched successfully! Writing to temporary storage...");
-
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/video.mp4');
       await file.writeAsBytes(response);
 
-      print("File written successfully at: ${file.path}");
-
       _controller = VideoPlayerController.file(file)
-        ..initialize()
-            .then((_) {
-              print("Video initialized successfully.");
-              setState(() {});
-            })
-            .catchError((error) {
-              print("Error initializing video: $error");
-            });
+        ..initialize().then((_) => setState(() {}));
     } catch (e) {
       print("Error fetching video: $e");
     }
@@ -84,7 +66,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
         children: [
           Text(
             widget.folder,
-            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           SizedBox(height: 16),
           if (_controller != null && _controller!.value.isInitialized)
@@ -124,7 +106,30 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
               ),
             )
           else
-            CircularProgressIndicator(), // Show loading while fetching video
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: AspectRatio(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.black,
+                  ),
+
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 5),
+                      Text(
+                        "Video is loading....",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                aspectRatio: 16 / 9,
+              ),
+            ),
 
           SizedBox(height: 10),
 
@@ -135,14 +140,6 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
               IconButton(
                 icon: Icon(Icons.replay_10, size: 30, color: Colors.grey),
                 onPressed: () {
-                  if (_controller == null ||
-                      !_controller!.value.isInitialized) {
-                    print(
-                      "Error: Video controller is null or not initialized.",
-                    );
-                    return;
-                  }
-                  print("Seeking backward...");
                   _controller?.seekTo(
                     _controller!.value.position - Duration(seconds: 10),
                   );
@@ -157,37 +154,16 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                   color: Colors.green,
                 ),
                 onPressed: () {
-                  if (_controller == null) {
-                    print("Error: Video controller is null.");
-                    return;
-                  }
-                  if (!_controller!.value.isInitialized) {
-                    print("Error: Video controller is not initialized.");
-                    return;
-                  }
-
                   setState(() {
-                    if (_controller!.value.isPlaying) {
-                      print("Pausing video...");
-                      _controller!.pause();
-                    } else {
-                      print("Playing video...");
-                      _controller!.play();
-                    }
+                    _controller!.value.isPlaying
+                        ? _controller!.pause()
+                        : _controller!.play();
                   });
                 },
               ),
               IconButton(
                 icon: Icon(Icons.forward_10, size: 30, color: Colors.grey),
                 onPressed: () {
-                  if (_controller == null ||
-                      !_controller!.value.isInitialized) {
-                    print(
-                      "Error: Video controller is null or not initialized.",
-                    );
-                    return;
-                  }
-                  print("Seeking forward...");
                   _controller?.seekTo(
                     _controller!.value.position + Duration(seconds: 10),
                   );
@@ -195,6 +171,23 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
               ),
             ],
           ),
+          SizedBox(height: 2),
+
+          /// Video Progress Bar
+          if (_controller != null && _controller!.value.isInitialized)
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: VideoProgressIndicator(
+                _controller!,
+                allowScrubbing: true,
+                colors: VideoProgressColors(
+                  playedColor: Colors.green,
+                  bufferedColor: Colors.grey,
+                  backgroundColor: Colors.black26,
+                ),
+              ),
+            ),
+
           SizedBox(height: 10),
         ],
       ),
@@ -217,16 +210,14 @@ class FullScreenVideo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
       body: Center(
         child: GestureDetector(
           onTap: () {
-            if (controller.value.isPlaying) {
-              print("Pausing full-screen video...");
-              controller.pause();
-            } else {
-              print("Playing full-screen video...");
-              controller.play();
-            }
+            controller.value.isPlaying ? controller.pause() : controller.play();
           },
           child: AspectRatio(
             aspectRatio: controller.value.aspectRatio,
