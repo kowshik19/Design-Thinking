@@ -3,10 +3,12 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
 import 'package:open_file/open_file.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart'; // For Preview
 
 class CertificateGenerator extends StatefulWidget {
   const CertificateGenerator({super.key});
@@ -17,6 +19,7 @@ class CertificateGenerator extends StatefulWidget {
 
 class _CertificateGeneratorState extends State<CertificateGenerator> {
   String? _certificatePath;
+  String? _previewPath;
   String? _userName;
   bool _isLoading = true;
 
@@ -44,56 +47,152 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
     }
   }
 
-  Future<void> _generateCertificate() async {
-    if (_userName == null || _userName!.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("User name not found!")));
-      return;
-    }
+  Future<void> generateCertificate(
+    String name,
+    String course,
+    String date,
+  ) async {
+    final pdf = pw.Document();
 
-    ByteData data = await rootBundle.load("assets/template.png");
-    Uint8List bytes = data.buffer.asUint8List();
-    img.Image? image = img.decodeImage(bytes);
+    // Load certificate template image
+    final ByteData bytes = await rootBundle.load('assets/template.png');
+    final Uint8List byteList = bytes.buffer.asUint8List();
 
-    if (image == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to load certificate template.")),
-      );
-      return;
-    }
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Stack(
+            children: [
+              // Background Certificate Image
+              pw.Positioned.fill(
+                child: pw.Image(pw.MemoryImage(byteList), fit: pw.BoxFit.cover),
+              ),
 
-    img.drawString(
-      image,
-      _userName!,
-      font: img.arial14,
-      x: 100,
-      y: 100,
-      color: img.ColorFloat16.rgb(0, 0, 0),
+              pw.Positioned(
+                left: 150,
+                top: 300,
+                child: pw.Text(
+                  name,
+                  style: pw.TextStyle(
+                    fontSize: 50,
+                    fontWeight: pw.FontWeight.normal,
+                  ),
+                ),
+              ),
+
+              pw.Positioned(
+                left: 110,
+                top: 500,
+                child: pw.Text("$date", style: pw.TextStyle(fontSize: 16)),
+              ),
+            ],
+          );
+        },
+      ),
     );
 
-    Uint8List outputBytes = Uint8List.fromList(img.encodePng(image));
-
-    Directory directory = await getApplicationDocumentsDirectory();
-    String path = "${directory.path}/Generated_Certificate.png";
-    File file = File(path);
-    await file.writeAsBytes(outputBytes);
+    // Save the preview certificate as a temporary file
+    final tempDir = await getTemporaryDirectory();
+    final previewFile = File("${tempDir.path}/certificate_preview.pdf");
+    await previewFile.writeAsBytes(await pdf.save());
 
     setState(() {
-      _certificatePath = path;
+      _previewPath = previewFile.path;
     });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text("Certificate saved to: $path")));
+    // Show preview dialog
+    _showPreviewDialog();
+  }
 
-    OpenFile.open(path);
+  void _showPreviewDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey,
+          title: Text(""),
+          content:
+              _previewPath == null
+                  ? CircularProgressIndicator()
+                  : Container(
+                    height: 400,
+                    child: PDFView(
+                      filePath: _previewPath!,
+                      enableSwipe: true,
+                      swipeHorizontal: false,
+                      autoSpacing: false,
+                      pageSnap: true,
+                      fitPolicy: FitPolicy.BOTH,
+                      onRender: (pages) {
+                        print("PDF rendered with $pages pages");
+                      },
+                      onError: (error) {
+                        print("Error loading PDF: $error");
+                        Navigator.pop(
+                          context,
+                        ); // Close the dialog if error occurs
+                        _showErrorDialog();
+                      },
+                    ),
+                  ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Cancel", style: TextStyle(color: Colors.black)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await saveCertificate();
+                Navigator.pop(context);
+              },
+              child: Text("Save", style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> saveCertificate() async {
+    if (_previewPath == null) return;
+
+    final output = await getApplicationDocumentsDirectory();
+    final savedFile = File("${output.path}/certificate.pdf");
+    await File(_previewPath!).copy(savedFile.path);
+
+    setState(() {
+      _certificatePath = savedFile.path;
+    });
+
+    print("Certificate saved at: ${savedFile.path}");
+  }
+
+  void _showErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Error"),
+          content: Text("Failed to load preview. Please try again."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(centerTitle: true),
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text("Certificate Generator", style: TextStyle(fontSize: 20)),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -106,8 +205,9 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
                   child: Column(
                     children: [
                       Align(
+                        alignment: Alignment.center,
                         child: const Text(
-                          "Click the below button to generate certificate",
+                          "Click the below button \n to generate certificate",
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -122,7 +222,15 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
               height: 60,
               width: 265,
               child: ElevatedButton(
-                onPressed: _generateCertificate,
+                onPressed: () {
+                  if (_userName != null) {
+                    generateCertificate(
+                      _userName!,
+                      "Design Thinking",
+                      "March 26, 2025",
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xff75DBCE),
                   foregroundColor: Colors.black,
@@ -130,7 +238,10 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text('Generate', style: TextStyle(fontSize: 20)),
+                child: const Text(
+                  'Generate Certificate',
+                  style: TextStyle(fontSize: 16),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -163,6 +274,15 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
                         "Saved at: $_certificatePath",
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (_certificatePath != null) {
+                            OpenFile.open(_certificatePath);
+                          }
+                        },
+                        child: const Text("Open Certificate"),
                       ),
                     ],
                   ),
