@@ -70,13 +70,16 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
               ),
 
               pw.Positioned(
-                left: 150,
-                top: 300,
-                child: pw.Text(
-                  name,
-                  style: pw.TextStyle(
-                    fontSize: 50,
-                    fontWeight: pw.FontWeight.normal,
+                left: 0,
+                right: 0,
+                top: 280, // Adjust this value based on your template
+                child: pw.Center(
+                  child: pw.Text(
+                    name,
+                    style: pw.TextStyle(
+                      fontSize: 35,
+                      fontWeight: pw.FontWeight.normal,
+                    ),
                   ),
                 ),
               ),
