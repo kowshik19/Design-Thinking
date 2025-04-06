@@ -1,4 +1,5 @@
 import 'package:design_thinking/Home/Account.dart';
+import 'package:design_thinking/Home/Account/Quiz.dart';
 import 'package:design_thinking/Home/Homescreen.dart';
 import 'package:design_thinking/Home/Play.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,8 @@ class _HomeState extends State<Home> {
           });
         },
       ),
-      VideoPlayScreen(folder: selectedFolder), // Pass selected folder name
+      VideoPlayScreen(folder: selectedFolder),
+      Quiz(), // Pass selected folder name
       Account(),
     ];
 
@@ -56,6 +58,14 @@ class _HomeState extends State<Home> {
             GButton(
               leading: Image.asset(
                 'assets/Nav/Search.png',
+                width: 24,
+                height: 24,
+              ),
+              icon: Icons.abc,
+            ),
+            GButton(
+              leading: Image.asset(
+                'assets/Nav/Vector.png',
                 width: 24,
                 height: 24,
               ),

@@ -50,7 +50,8 @@ dependencies:
   pdf: ^3.11.3
   flutter_pdfview: ^1.4.0
   printing: ^5.14.2
-  pdf_render: ^1.4.12
+  
+  shared_preferences: ^2.5.3
 dependency_overrides:
   flutter_web_auth_2: 4.1.0
 
@@ -83,6 +84,7 @@ flutter:
     - assets/
     - assets/Nav/
     - assets/fonts/
+    - assets/quiz/
    
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

@@ -192,7 +192,9 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         centerTitle: true,
         title: Text("Certificate Generator", style: TextStyle(fontSize: 20)),
       ),

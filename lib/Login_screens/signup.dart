@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:design_thinking/Login_screens/login.dart'; // Added Import
+import 'package:design_thinking/Login_screens/login.dart';
 
 class Signup extends StatefulWidget {
   const Signup({super.key});
@@ -17,20 +17,37 @@ class _SignupState extends State<Signup> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   Future<void> _signUpUser() async {
+    if (_firstNameController.text.trim().isEmpty ||
+        _lastNameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("All fields are required")));
+      return;
+    }
+
+    if (_passwordController.text.trim().length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Password must be at least 6 characters")),
+      );
+      return;
+    }
+
     try {
-      // Firebase Authentication - Creating User
+      setState(() => _isLoading = true);
+
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
 
-      // Get user UID
       String uid = userCredential.user!.uid;
 
-      // Storing Data in Firestore
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
@@ -38,7 +55,7 @@ class _SignupState extends State<Signup> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Navigate to OTP screen
+      // Navigate to Home screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const Home()),
@@ -47,7 +64,18 @@ class _SignupState extends State<Signup> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+    } finally {
+      setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -82,6 +110,7 @@ class _SignupState extends State<Signup> {
                         child: _buildTextField(
                           hint: 'First Name',
                           controller: _firstNameController,
+                          autofillHint: AutofillHints.givenName,
                         ),
                       ),
                       SizedBox(width: screenWidth * 0.05),
@@ -89,6 +118,7 @@ class _SignupState extends State<Signup> {
                         child: _buildTextField(
                           hint: 'Last Name',
                           controller: _lastNameController,
+                          autofillHint: AutofillHints.familyName,
                         ),
                       ),
                     ],
@@ -100,6 +130,7 @@ class _SignupState extends State<Signup> {
                   _buildTextField(
                     hint: 'name@example.com',
                     controller: _emailController,
+                    autofillHint: AutofillHints.email,
                   ),
 
                   SizedBox(height: screenHeight * 0.025),
@@ -110,6 +141,7 @@ class _SignupState extends State<Signup> {
                     hint: '********',
                     obscureText: _obscurePassword,
                     controller: _passwordController,
+                    autofillHint: AutofillHints.newPassword,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -131,7 +163,7 @@ class _SignupState extends State<Signup> {
                     height: screenHeight * 0.07,
                     width: screenWidth * 0.6,
                     child: ElevatedButton(
-                      onPressed: _signUpUser,
+                      onPressed: _isLoading ? null : _signUpUser,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xff75DBCE),
                         foregroundColor: Colors.black,
@@ -139,10 +171,15 @@ class _SignupState extends State<Signup> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: Text(
-                        'Signup',
-                        style: TextStyle(fontSize: screenWidth * 0.05),
-                      ),
+                      child:
+                          _isLoading
+                              ? const CircularProgressIndicator(
+                                color: Colors.black,
+                              )
+                              : Text(
+                                'Signup',
+                                style: TextStyle(fontSize: screenWidth * 0.05),
+                              ),
                     ),
                   ),
 
@@ -165,7 +202,7 @@ class _SignupState extends State<Signup> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const Login(),
-                            ), // Fixed Navigation
+                            ),
                           );
                         },
                         child: const Text(
@@ -192,12 +229,15 @@ class _SignupState extends State<Signup> {
   Widget _buildLabel(String text) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 16,
-          color: Color(0xff636D77),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10.0),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 16,
+            color: Color(0xff636D77),
+          ),
         ),
       ),
     );
@@ -208,6 +248,7 @@ class _SignupState extends State<Signup> {
     bool obscureText = false,
     Widget? suffixIcon,
     required TextEditingController controller,
+    String? autofillHint,
   }) {
     return Container(
       margin: const EdgeInsets.only(top: 6),
@@ -224,6 +265,7 @@ class _SignupState extends State<Signup> {
       child: TextField(
         controller: controller,
         obscureText: obscureText,
+        autofillHints: autofillHint != null ? [autofillHint] : null,
         decoration: InputDecoration(
           fillColor: Colors.white,
           filled: true,
