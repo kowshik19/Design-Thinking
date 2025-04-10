@@ -21,12 +21,12 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   late Storage storage;
 
   final Map<String, String> flutterVideos = {
-    "What is Design Thinking": "67d7ce26000d3520ae8a",
-    "Empathize": "67d7ce9d003ac9672d11",
-    "Define": "67d7ceb000105e38c7b8",
-    "Ideate": "67d7ceb8003ae649eb81",
-    "Prototype": "67d7cec800034d71269b",
-    "Test": "67d7cecf00125a2cdb53",
+    "What is Design Thinking": "67f74580000a48e1556e",
+    "Empathize": "67f745ad000418c9e95c",
+    "Define": "67f745e900120b251345",
+    "Ideate": "67f746300032cc6fa46e",
+    "Prototype": "67f7463c0032e5268652",
+    "Test": "67f7464200205989930d",
   };
 
   @override
@@ -34,7 +34,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
     super.initState();
     client = Client()
         .setEndpoint('https://cloud.appwrite.io/v1')
-        .setProject("67d037a100204739d319");
+        .setProject("67f744550032860f1e2d");
     storage = Storage(client);
     fetchVideoUrl();
   }
@@ -45,7 +45,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       if (fileId == null) return;
 
       final Uint8List response = await storage.getFileView(
-        bucketId: '67d039f800168f252c0c',
+        bucketId: '67f744af0010de60be7f',
         fileId: fileId,
       );
 
