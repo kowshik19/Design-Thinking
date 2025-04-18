@@ -117,7 +117,10 @@ class _QuizState extends State<Quiz> {
         nextPage = HomeScreen(onModuleTap: (folder) {});
         break;
       case 1:
-        nextPage = const VideoPlayScreen(folder: ""); // Adjust as needed
+        nextPage = VideoPlayScreen(
+          moduleName: "moduleName",
+          lessons: [],
+        ); // Adjust as needed
         break;
       case 2:
         return; // Already in Quiz page, do nothing

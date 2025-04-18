@@ -687,18 +687,18 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
       appBar: AppBar(
         backgroundColor: Colors.redAccent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            if (quizCompleted) {
-              widget.onQuizComplete(score >= 10);
-            }
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => Quiz()),
-            );
-          },
-        ),
+        // leading: IconButton(
+        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
+        //   onPressed: () {
+        //     // if (quizCompleted) {
+        //     //   widget.onQuizComplete(score >= 10);
+        //     // }
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(builder: (context) => Quiz()),
+        //     );
+        //   },
+        // ),
         title: Text(
           widget.lessonTitle,
           style: const TextStyle(

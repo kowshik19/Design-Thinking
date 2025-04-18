@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/firebase/auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';

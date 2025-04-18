@@ -55,6 +55,7 @@ class _ProfileState extends State<Profile> {
             backgroundColor: Colors.white,
           ),
         );
+        Navigator.pop(context);
       } catch (e) {
         ScaffoldMessenger.of(
           context,

@@ -1,4 +1,5 @@
 import 'package:design_thinking/Login_screens/signup.dart';
+import 'package:design_thinking/phone_authentication/phone_auth.dart';
 import 'package:flutter/material.dart';
 
 class S3 extends StatelessWidget {
@@ -75,7 +76,7 @@ class S3 extends StatelessWidget {
                       onPressed: () {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => Signup()),
+                          MaterialPageRoute(builder: (context) => PhoneAuth()),
                         );
                       },
                       style: ElevatedButton.styleFrom(

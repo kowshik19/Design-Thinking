@@ -13,18 +13,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String userName = "User"; // Default value
-  List<String> modules = [
-    "What is Design Thinking",
-    "Empathize",
-    "Define",
-    "Ideate",
-    "Prototype",
-    "Test",
-  ];
+  String userName = "User";
   List<String> ongoing = [];
   List<String> completed = [];
   late bool progress = false;
+
+  final List<Map<String, String>> allModules = [
+    {
+      "title": "Introduction Of Design Thinking",
+      "lessons": "2 Lessons",
+      "duration": "30 Min",
+      "image": "assets/images/ob_img3.png",
+    },
+    {
+      "title": "Empathize",
+      "lessons": "5 Lessons",
+      "duration": "1hr 20Min",
+      "image": "assets/images/ob_img3.png",
+    },
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen>
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
       setState(() {
-        userName = userDoc['firstName'] ?? 'User'; // Ensure proper fallback
+        userName = userDoc['firstName'] ?? 'User';
       });
     } catch (e) {
       print("Error fetching user name: $e");
@@ -100,19 +108,15 @@ class _HomeScreenState extends State<HomeScreen>
           .doc(uid)
           .collection('ongoingModules');
 
-      // Check if the module already exists
-      QuerySnapshot existingModules =
+      QuerySnapshot existing =
           await ongoingCollection.where('name', isEqualTo: moduleName).get();
 
-      if (existingModules.docs.isEmpty) {
-        // Add only if it doesn't already exist
+      if (existing.docs.isEmpty) {
         await ongoingCollection.add({'name': moduleName});
-        fetchOngoingModules(); // Refresh list
-      } else {
-        print("Module already exists in ongoing list.");
+        fetchOngoingModules();
       }
     } catch (e) {
-      print("Error adding module: $e");
+      print("Error adding module to ongoing: $e");
     }
   }
 
@@ -124,16 +128,13 @@ class _HomeScreenState extends State<HomeScreen>
           .doc(uid)
           .collection('completedModules');
 
-      // Check if the module is already in the completed list
-      QuerySnapshot existingModules =
+      QuerySnapshot existing =
           await completedCollection.where('name', isEqualTo: moduleName).get();
 
-      if (existingModules.docs.isEmpty) {
-        // Add to completed list
+      if (existing.docs.isEmpty) {
         await completedCollection.add({'name': moduleName});
 
-        // Remove from ongoing list
-        QuerySnapshot ongoingModulesSnapshot =
+        QuerySnapshot ongoingSnapshot =
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(uid)
@@ -141,18 +142,87 @@ class _HomeScreenState extends State<HomeScreen>
                 .where('name', isEqualTo: moduleName)
                 .get();
 
-        for (var doc in ongoingModulesSnapshot.docs) {
+        for (var doc in ongoingSnapshot.docs) {
           await doc.reference.delete();
         }
 
         fetchOngoingModules();
         fetchCompletedModules();
-      } else {
-        print("Module already exists in completed list.");
       }
     } catch (e) {
       print("Error marking module as completed: $e");
     }
+  }
+
+  Widget _buildLessonList(
+    List<Map<String, String>> modules, {
+    IconData? actionIcon,
+    Color? iconColor,
+    Function(String)? onTap,
+  }) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      itemCount: modules.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final module = modules[index];
+        return GestureDetector(
+          onTap: () {
+            if (onTap != null) {
+              onTap(module['title']!);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 5,
+                  color: Colors.grey.shade200,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Image.asset(module['image']!, height: 50, width: 50),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        module['title']!,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            module['lessons'] ?? '',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(width: 10),
+                          const Icon(Icons.play_circle_fill, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            module['duration'] ?? '',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (actionIcon != null)
+                  Icon(actionIcon, color: iconColor ?? Colors.grey),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -163,6 +233,7 @@ class _HomeScreenState extends State<HomeScreen>
         padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
+            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -177,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen>
                     children: [
                       Text(
                         'Hi, $userName 👋',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
@@ -192,157 +263,140 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
+
             Image.asset('assets/HomeScreen_banner.png', scale: 0.1),
-            SizedBox(height: 20),
-            Align(
+            const SizedBox(height: 20),
+
+            const Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Design Thinking Framework',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),
-            SizedBox(height: 20),
-            progress
-                ? Image.asset('assets/HomeScreen_img1.png')
-                : Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: Color(0xffA8E8F9),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 20),
+
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: const Color(0xffA8E8F9),
+              ),
+              height: 130,
+              width: 333,
+              child: Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Overall Mastery',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Image.asset('assets/star.png'),
-                          ],
-                        ),
                         Text(
-                          'Unlock your greatness',
+                          'Overall Mastery',
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w400,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 12),
-                        LinearProgressIndicator(
-                          minHeight: 8,
-                          borderRadius: BorderRadius.circular(8),
-                          value: completed.length / 6,
-                          color: Color(0xff8DF13F),
-                          backgroundColor: Colors.grey,
-                        ),
-                        SizedBox(height: 12),
-                        Image.asset('assets/star.png'),
+                        Icon(Icons.star, color: Colors.yellow),
                       ],
                     ),
-                  ),
-                  height: 130,
-                  width: 333,
+                    const Text(
+                      'Unlock your greatness',
+                      style: TextStyle(fontSize: 10),
+                    ),
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(8),
+                      value: completed.length / 6,
+                      color: const Color(0xff8DF13F),
+                      backgroundColor: Colors.grey,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
-            SizedBox(height: 20),
-            Align(
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            const Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 "Let's Start",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
             ),
-            Theme(
-              data: ThemeData(
-                tabBarTheme: TabBarTheme(dividerColor: Colors.transparent),
-              ),
-              child: TabBar(
-                onTap: (index) {
-                  setState(() {
-                    progress =
-                        (index == 0); // Show progress only in "Modules" tab
-                  });
-                },
 
-                controller: _tabController,
-                indicatorColor: Color(0xffE8505B),
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.grey,
-                labelStyle: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-                tabs: [
-                  Tab(text: "Modules"),
-                  Tab(text: 'Ongoing'),
-                  Tab(text: 'Completed'),
-                ],
+            TabBar(
+              onTap: (index) {
+                setState(() {
+                  progress = (index == 0);
+                });
+              },
+              controller: _tabController,
+              indicatorColor: const Color(0xffE8505B),
+              labelColor: Colors.black,
+              unselectedLabelColor: Colors.grey,
+              labelStyle: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
               ),
+              tabs: const [
+                Tab(text: "Modules"),
+                Tab(text: 'Ongoing'),
+                Tab(text: 'Completed'),
+              ],
             ),
+
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  ListView.builder(
-                    itemCount: modules.length,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(
-                          modules[index],
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        trailing: Icon(Icons.play_circle, color: Colors.grey),
-                        onTap: () {
-                          addToOngoing(modules[index]);
-                          widget.onModuleTap(modules[index]);
-                          setState(() {});
-                        },
-                      );
+                  // MODULES TAB
+                  _buildLessonList(
+                    allModules,
+                    actionIcon: Icons.play_circle,
+                    onTap: (title) {
+                      addToOngoing(title);
+                      widget.onModuleTap(title);
                     },
                   ),
-                  ListView.builder(
-                    itemCount: ongoing.length,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(
-                          ongoing[index],
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        trailing: Icon(Icons.play_circle, color: Colors.green),
-                        onTap: () {
-                          markAsCompleted(ongoing[index]);
-                          widget.onModuleTap(ongoing[index]);
-                          setState(() {});
-                        },
-                      );
+
+                  // ONGOING TAB
+                  _buildLessonList(
+                    ongoing
+                        .map(
+                          (e) => {
+                            "title": e,
+                            "lessons": "",
+                            "duration": "",
+                            "image": "assets/images/ob_img3.png",
+                          },
+                        )
+                        .toList(),
+                    actionIcon: Icons.play_circle_fill,
+                    iconColor: Colors.green,
+                    onTap: (title) {
+                      markAsCompleted(title);
+                      widget.onModuleTap(title);
                     },
                   ),
-                  ListView.builder(
-                    itemCount: completed.length,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(
-                          completed[index],
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        trailing: Icon(Icons.check_circle, color: Colors.blue),
-                      );
-                    },
+
+                  // COMPLETED TAB
+                  _buildLessonList(
+                    completed
+                        .map(
+                          (e) => {
+                            "title": e,
+                            "lessons": "",
+                            "duration": "",
+                            "image": "assets/images/ob_img3.png",
+                          },
+                        )
+                        .toList(),
+                    actionIcon: Icons.check_circle,
+                    iconColor: Colors.blue,
                   ),
                 ],
               ),
