@@ -1,4 +1,6 @@
+import 'package:design_thinking/phone_authentication/otp_success.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/Login_screens/Forgot_password.dart';
@@ -18,11 +20,44 @@ class _LoginState extends State<Login> {
   bool _obscurePassword = true;
 
   Future<void> _login() async {
+    String loginInput = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+
     try {
-      await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      if (loginInput.contains('@')) {
+        // If the input contains '@', treat it as an email
+        await _auth.signInWithEmailAndPassword(
+          email: loginInput,
+          password: password,
+        );
+      } else {
+        // If it's not an email, treat it as a username and fetch associated email
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .where(
+              'username',
+              isEqualTo: loginInput,
+            ) // Assuming 'username' is stored in Firestore
+            .limit(1)
+            .get()
+            .then((snapshot) {
+              if (snapshot.docs.isNotEmpty) {
+                return snapshot.docs.first;
+              } else {
+                throw 'No user found with this username.';
+              }
+            });
+
+        String userEmail = userDoc['email'];
+
+        // Use the email associated with the username to sign in
+        await _auth.signInWithEmailAndPassword(
+          email: userEmail,
+          password: password,
+        );
+      }
+
+      // If login successful, navigate to Home
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => Home()),
@@ -52,11 +87,11 @@ class _LoginState extends State<Login> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 25),
-              _buildLabel('Email'),
+              _buildLabel('Email or Username'),
               const SizedBox(height: 6),
               _buildTextField(
                 controller: _emailController,
-                hint: 'name@example.com',
+                hint: 'name@example.com or Username',
               ),
               const SizedBox(height: 15),
               _buildLabel('Password'),
@@ -149,54 +184,54 @@ class _LoginState extends State<Login> {
       ),
     );
   }
-}
 
-Widget _buildLabel(String text) {
-  return Align(
-    alignment: Alignment.centerLeft,
-    child: Text(
-      text,
-      style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 16),
-    ),
-  );
-}
-
-Widget _buildTextField({
-  required TextEditingController controller,
-  required String hint,
-  bool obscureText = false,
-  Widget? suffixIcon,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(top: 6),
-    decoration: BoxDecoration(
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xff000000).withOpacity(0.1),
-          blurRadius: 6,
-          spreadRadius: 0,
-          offset: const Offset(0, 7),
-        ),
-      ],
-    ),
-    child: TextField(
-      controller: controller,
-      obscureText: obscureText,
-      decoration: InputDecoration(
-        fillColor: Colors.white,
-        filled: true,
-        hintText: hint,
-        hintStyle: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
-          color: Color(0xff636D77),
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        suffixIcon: suffixIcon,
+  Widget _buildLabel(String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 16),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xff000000).withOpacity(0.1),
+            blurRadius: 6,
+            spreadRadius: 0,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          fillColor: Colors.white,
+          filled: true,
+          hintText: hint,
+          hintStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            color: Color(0xff636D77),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          suffixIcon: suffixIcon,
+        ),
+      ),
+    );
+  }
 }

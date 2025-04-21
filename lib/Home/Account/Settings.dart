@@ -2,14 +2,14 @@ import 'package:design_thinking/Home/Account/AboutUs.dart';
 import 'package:design_thinking/Login_screens/Forgot_password.dart';
 import 'package:flutter/material.dart';
 
-class Settings extends StatefulWidget {
-  const Settings({super.key});
+class AccountSettings extends StatefulWidget {
+  const AccountSettings({super.key});
 
   @override
-  State<Settings> createState() => _SettingsState();
+  State<AccountSettings> createState() => _AccountSettingsState();
 }
 
-class _SettingsState extends State<Settings> {
+class _AccountSettingsState extends State<AccountSettings> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(

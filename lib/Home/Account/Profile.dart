@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Profile extends StatefulWidget {
@@ -15,9 +18,82 @@ class _ProfileState extends State<Profile> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _schoolController = TextEditingController();
+  String? _profileImageUrl; // For storing the user's profile image URL
+  File? _selectedImage; // For storing the picked image file
+  bool _isPickingImage = false; // Flag to prevent multiple image picker dialogs
 
   final _formKey = GlobalKey<FormState>();
 
+  // Fetch the user data from Firestore
+  Future<void> _fetchUserProfile() async {
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      DocumentSnapshot userSnapshot =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (userSnapshot.exists) {
+        var userData = userSnapshot.data() as Map<String, dynamic>;
+        _firstNameController.text = userData['firstName'] ?? '';
+        _lastNameController.text = userData['lastName'] ?? '';
+        _emailController.text = userData['email'] ?? '';
+        _dobController.text = userData['dob'] ?? '';
+        _schoolController.text = userData['school'] ?? '';
+        _profileImageUrl =
+            userData['profileImageUrl']; // Assuming the image URL is stored in Firestore
+        setState(() {});
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error fetching profile: $e")));
+    }
+  }
+
+  // Pick an image using image_picker
+  Future<void> _pickImage() async {
+    if (_isPickingImage)
+      return; // Prevent opening the picker if it's already active
+    setState(() {
+      _isPickingImage = true;
+    });
+
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+    ); // You can use ImageSource.camera for camera
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+
+    setState(() {
+      _isPickingImage = false; // Reset the flag after the image is picked
+    });
+  }
+
+  // Upload the image to Firebase Storage
+  Future<String> _uploadImage() async {
+    if (_selectedImage == null)
+      return ''; // If no image is selected, return empty string
+
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      Reference storageRef = FirebaseStorage.instance.ref().child(
+        'profile_images/$uid.jpg',
+      );
+      UploadTask uploadTask = storageRef.putFile(_selectedImage!);
+
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      throw Exception("Error uploading image: $e");
+    }
+  }
+
+  // Select the date of birth
   Future<void> _selectDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
@@ -34,16 +110,27 @@ class _ProfileState extends State<Profile> {
     }
   }
 
+  // Update profile data in Firestore
   Future<void> _updateProfile() async {
     if (_formKey.currentState!.validate()) {
       try {
         String uid = FirebaseAuth.instance.currentUser!.uid;
+
+        String imageUrl =
+            _profileImageUrl ?? ''; // If there's an existing image URL, keep it
+
+        if (_selectedImage != null) {
+          // If a new image is selected, upload it to Firebase Storage and get the new URL
+          imageUrl = await _uploadImage();
+        }
+
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'firstName': _firstNameController.text,
           'lastName': _lastNameController.text,
           'email': _emailController.text,
           'dob': _dobController.text,
           'school': _schoolController.text,
+          'profileImageUrl': imageUrl, // Save the new profile image URL
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -62,6 +149,12 @@ class _ProfileState extends State<Profile> {
         ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
       }
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserProfile(); // Fetch user profile data on init
   }
 
   @override
@@ -93,16 +186,25 @@ class _ProfileState extends State<Profile> {
                 child: Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 80,
-                      backgroundImage: AssetImage(
-                        "assets/HomeScreen_Profile.png",
-                      ),
+                      backgroundImage:
+                          _selectedImage != null
+                              ? FileImage(
+                                _selectedImage!,
+                              ) // Show the selected image
+                              : (_profileImageUrl != null
+                                  ? NetworkImage(
+                                    _profileImageUrl!,
+                                  ) // Show the image from Firestore
+                                  : const AssetImage(
+                                        "assets/HomeScreen_Profile.png",
+                                      )
+                                      as ImageProvider),
                     ),
                     IconButton(
-                      onPressed: () {
-                        // Implement image picker here
-                      },
+                      onPressed:
+                          _pickImage, // Allow the user to pick a new image
                       icon: const Icon(Icons.edit, size: 30),
                     ),
                   ],

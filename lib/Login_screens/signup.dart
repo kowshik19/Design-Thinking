@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:design_thinking/Home/Home.dart';
+import 'package:design_thinking/phone_authentication/phone_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:design_thinking/Login_screens/login.dart';
 
 class Signup extends StatefulWidget {
@@ -16,23 +20,67 @@ class _SignupState extends State<Signup> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+
   bool _obscurePassword = true;
   bool _isLoading = false;
+  File? _profileImage;
+
+  final RegExp _usernameRegex = RegExp(r'^[a-zA-Z0-9_]+$');
+  final RegExp _emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+
+  Future<void> _pickImage() async {
+    final pickedFile = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<String?> _uploadImageToStorage(String uid) async {
+    if (_profileImage == null) return null;
+
+    final storageRef = FirebaseStorage.instance.ref().child(
+      'profile_images/$uid.jpg',
+    );
+    await storageRef.putFile(_profileImage!);
+    return await storageRef.getDownloadURL();
+  }
 
   Future<void> _signUpUser() async {
-    if (_firstNameController.text.trim().isEmpty ||
-        _lastNameController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("All fields are required")));
+    String firstName = _firstNameController.text.trim();
+    String lastName = _lastNameController.text.trim();
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+    String username = _usernameController.text.trim();
+
+    if (firstName.isEmpty ||
+        lastName.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        username.isEmpty) {
+      _showMessage("All fields are required");
       return;
     }
 
-    if (_passwordController.text.trim().length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password must be at least 6 characters")),
+    if (!_emailRegex.hasMatch(email)) {
+      _showMessage("Please enter a valid email address");
+      return;
+    }
+
+    if (password.length < 6) {
+      _showMessage("Password must be at least 6 characters");
+      return;
+    }
+
+    if (!_usernameRegex.hasMatch(username)) {
+      _showMessage(
+        "Username can only contain letters, numbers, and underscores",
       );
       return;
     }
@@ -40,33 +88,74 @@ class _SignupState extends State<Signup> {
     try {
       setState(() => _isLoading = true);
 
+      // Check if the username is already taken
+      final usernameSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: username)
+              .get();
+
+      if (usernameSnapshot.docs.isNotEmpty) {
+        _showMessage("Username is already taken");
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Create the user with email and password
       UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       String uid = userCredential.user!.uid;
+      String fullName = "$firstName $lastName";
 
+      // Proceed with image upload only if image is picked
+      String? photoUrl;
+      if (_profileImage != null) {
+        photoUrl = await _uploadImageToStorage(uid);
+        if (photoUrl == null) {
+          _showMessage("Profile image upload failed!");
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
+      // Store user details in Firestore (even without profile image)
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        'email': _emailController.text.trim(),
+        'firstName': firstName,
+        'lastName': lastName,
+        'fullName': fullName,
+        'email': email,
+        'username': username,
+        'photoUrl': photoUrl ?? "", // Store empty string if no image
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Navigate to Home screen
+      print("User document created with ID: $uid");
+
+      // Verify if document is actually created
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        print("User document exists: ${userDoc.data()}");
+      } else {
+        print("User document creation failed!");
+      }
+
+      // Proceed to phone authentication screen
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const Home()),
+        MaterialPageRoute(builder: (context) => const PhoneAuth()),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+      _showMessage("Error: ${e.toString()}");
+      print("Signup error: $e"); // Print to debug
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _showMessage(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -75,6 +164,7 @@ class _SignupState extends State<Signup> {
     _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -93,16 +183,35 @@ class _SignupState extends State<Signup> {
               child: Column(
                 children: [
                   SizedBox(height: screenHeight * 0.05),
-                  Image.asset('assets/login_img1.png', height: 200),
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundImage:
+                          _profileImage != null
+                              ? FileImage(_profileImage!)
+                              : const AssetImage('assets/default_avatar.png')
+                                  as ImageProvider,
+                      child:
+                          _profileImage == null
+                              ? const Icon(
+                                Icons.camera_alt,
+                                size: 30,
+                                color: Colors.white,
+                              )
+                              : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Tap to upload profile picture'),
+
                   SizedBox(height: screenHeight * 0.02),
                   const Text(
                     'Hey Champ👋,\nLet’s Create Your Account ',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: screenHeight * 0.01),
 
-                  // Name Fields
                   _buildLabel('Name'),
                   Row(
                     children: [
@@ -110,7 +219,6 @@ class _SignupState extends State<Signup> {
                         child: _buildTextField(
                           hint: 'First Name',
                           controller: _firstNameController,
-                          autofillHint: AutofillHints.givenName,
                         ),
                       ),
                       SizedBox(width: screenWidth * 0.05),
@@ -118,30 +226,28 @@ class _SignupState extends State<Signup> {
                         child: _buildTextField(
                           hint: 'Last Name',
                           controller: _lastNameController,
-                          autofillHint: AutofillHints.familyName,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: screenHeight * 0.025),
 
-                  // Email Field
                   _buildLabel('Email address'),
                   _buildTextField(
                     hint: 'name@example.com',
                     controller: _emailController,
-                    autofillHint: AutofillHints.email,
                   ),
 
-                  SizedBox(height: screenHeight * 0.025),
+                  _buildLabel('Username'),
+                  _buildTextField(
+                    hint: 'e.g. arul_45',
+                    controller: _usernameController,
+                  ),
 
-                  // Password Field
-                  _buildLabel('Create Password'),
+                  _buildLabel('Password'),
                   _buildTextField(
                     hint: '********',
-                    obscureText: _obscurePassword,
                     controller: _passwordController,
-                    autofillHint: AutofillHints.newPassword,
+                    obscureText: _obscurePassword,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -157,8 +263,6 @@ class _SignupState extends State<Signup> {
                   ),
 
                   SizedBox(height: screenHeight * 0.04),
-
-                  // Signup Button
                   SizedBox(
                     height: screenHeight * 0.07,
                     width: screenWidth * 0.6,
@@ -183,18 +287,12 @@ class _SignupState extends State<Signup> {
                     ),
                   ),
 
-                  SizedBox(height: screenHeight * 0.01),
-
-                  // Login Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
                         'You have an account?',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w400,
-                        ),
+                        style: TextStyle(fontSize: 18),
                       ),
                       TextButton(
                         onPressed: () {
@@ -207,11 +305,7 @@ class _SignupState extends State<Signup> {
                         },
                         child: const Text(
                           'Login',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                          ),
+                          style: TextStyle(color: Colors.blue),
                         ),
                       ),
                     ],
@@ -245,10 +339,9 @@ class _SignupState extends State<Signup> {
 
   Widget _buildTextField({
     required String hint,
+    required TextEditingController controller,
     bool obscureText = false,
     Widget? suffixIcon,
-    required TextEditingController controller,
-    String? autofillHint,
   }) {
     return Container(
       margin: const EdgeInsets.only(top: 6),
@@ -265,7 +358,6 @@ class _SignupState extends State<Signup> {
       child: TextField(
         controller: controller,
         obscureText: obscureText,
-        autofillHints: autofillHint != null ? [autofillHint] : null,
         decoration: InputDecoration(
           fillColor: Colors.white,
           filled: true,

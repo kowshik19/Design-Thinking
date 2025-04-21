@@ -76,7 +76,7 @@ class S3 extends StatelessWidget {
                       onPressed: () {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => PhoneAuth()),
+                          MaterialPageRoute(builder: (context) => Signup()),
                         );
                       },
                       style: ElevatedButton.styleFrom(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(String) onModuleTap;
@@ -14,152 +15,182 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String userName = "User";
+  String fullName = "User";
+  String profileImageUrl = '';
   List<String> ongoing = [];
   List<String> completed = [];
-  late bool progress = false;
-
-  final List<Map<String, String>> allModules = [
-    {
-      "title": "Introduction Of Design Thinking",
-      "lessons": "2 Lessons",
-      "duration": "30 Min",
-      "image": "assets/images/ob_img3.png",
-    },
-    {
-      "title": "Empathize",
-      "lessons": "5 Lessons",
-      "duration": "1hr 20Min",
-      "image": "assets/images/ob_img3.png",
-    },
-  ];
+  List<Map<String, dynamic>> allModules = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    fetchUserName();
+    fetchUserData();
+    fetchModules();
     fetchOngoingModules();
     fetchCompletedModules();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> fetchUserName() async {
+  Future<void> fetchUserData() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
       DocumentSnapshot userDoc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        setState(() {
+          String firstName = userDoc['firstName'] ?? 'First';
+          String lastName = userDoc['lastName'] ?? 'Name';
+          fullName = "$firstName $lastName";
+          userName = firstName;
+          profileImageUrl = userDoc['profileImageUrl'] ?? '';
+        });
+      }
+    } catch (e) {
+      print("User fetch error: $e");
+    }
+  }
+
+  Future<void> fetchModules() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('module').get();
 
       setState(() {
-        userName = userDoc['firstName'] ?? 'User';
+        allModules =
+            snapshot.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return {
+                "title": data['title'] ?? '',
+                "lessons": "${data['lessons'] ?? 0} Lessons",
+                "duration": data['duration'] ?? '',
+                "image": data['imageUrl'] ?? 'assets/images/ob_img3.png',
+              };
+            }).toList();
       });
     } catch (e) {
-      print("Error fetching user name: $e");
+      print("Module fetch error: $e");
     }
   }
 
   Future<void> fetchOngoingModules() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
-      QuerySnapshot querySnapshot =
+      QuerySnapshot query =
           await FirebaseFirestore.instance
               .collection('users')
               .doc(uid)
               .collection('ongoingModules')
               .get();
-
       setState(() {
-        ongoing =
-            querySnapshot.docs.map((doc) => doc['name'].toString()).toList();
+        ongoing = query.docs.map((doc) => doc['name'].toString()).toList();
       });
     } catch (e) {
-      print("Error fetching ongoing modules: $e");
+      print("Ongoing fetch error: $e");
     }
   }
 
   Future<void> fetchCompletedModules() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
-      QuerySnapshot querySnapshot =
+      QuerySnapshot query =
           await FirebaseFirestore.instance
               .collection('users')
               .doc(uid)
               .collection('completedModules')
               .get();
-
       setState(() {
-        completed =
-            querySnapshot.docs.map((doc) => doc['name'].toString()).toList();
+        completed = query.docs.map((doc) => doc['name'].toString()).toList();
       });
     } catch (e) {
-      print("Error fetching completed modules: $e");
+      print("Completed fetch error: $e");
     }
   }
 
-  Future<void> addToOngoing(String moduleName) async {
+  Future<void> addToOngoing(String title) async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
-      CollectionReference ongoingCollection = FirebaseFirestore.instance
+      var ongoingRef = FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('ongoingModules');
 
-      QuerySnapshot existing =
-          await ongoingCollection.where('name', isEqualTo: moduleName).get();
+      var exists = await ongoingRef.where('name', isEqualTo: title).get();
 
-      if (existing.docs.isEmpty) {
-        await ongoingCollection.add({'name': moduleName});
+      if (exists.docs.isEmpty) {
+        await ongoingRef.add({'name': title});
+        await _saveResumePoint(title, 0);
         fetchOngoingModules();
       }
     } catch (e) {
-      print("Error adding module to ongoing: $e");
+      print("Add ongoing error: $e");
     }
   }
 
-  Future<void> markAsCompleted(String moduleName) async {
+  Future<void> markAsCompleted(String title) async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
-      CollectionReference completedCollection = FirebaseFirestore.instance
+      var completedRef = FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('completedModules');
 
-      QuerySnapshot existing =
-          await completedCollection.where('name', isEqualTo: moduleName).get();
+      var exists = await completedRef.where('name', isEqualTo: title).get();
 
-      if (existing.docs.isEmpty) {
-        await completedCollection.add({'name': moduleName});
+      if (exists.docs.isEmpty) {
+        await completedRef.add({'name': title});
 
-        QuerySnapshot ongoingSnapshot =
+        var ongoingDocs =
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(uid)
                 .collection('ongoingModules')
-                .where('name', isEqualTo: moduleName)
+                .where('name', isEqualTo: title)
                 .get();
 
-        for (var doc in ongoingSnapshot.docs) {
+        for (var doc in ongoingDocs.docs) {
           await doc.reference.delete();
         }
+
+        await _clearResumePoint(title);
 
         fetchOngoingModules();
         fetchCompletedModules();
       }
     } catch (e) {
-      print("Error marking module as completed: $e");
+      print("Mark completed error: $e");
     }
   }
 
+  Future<void> _saveResumePoint(String module, int position) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('resume_$module', position);
+  }
+
+  Future<int> _getResumePoint(String module) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('resume_$module') ?? 0;
+  }
+
+  Future<void> _clearResumePoint(String module) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove('resume_$module');
+  }
+
   Widget _buildLessonList(
-    List<Map<String, String>> modules, {
+    List<Map<String, dynamic>> modules, {
     IconData? actionIcon,
     Color? iconColor,
     Function(String)? onTap,
   }) {
+    if (modules.isEmpty) {
+      return Center(
+        child: Text(
+          'No modules available.',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 10),
       itemCount: modules.length,
@@ -167,9 +198,10 @@ class _HomeScreenState extends State<HomeScreen>
       itemBuilder: (context, index) {
         final module = modules[index];
         return GestureDetector(
-          onTap: () {
+          onTap: () async {
             if (onTap != null) {
-              onTap(module['title']!);
+              onTap(module['title']);
+              await addToOngoing(module['title']);
             }
           },
           child: Container(
@@ -187,14 +219,13 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             child: Row(
               children: [
-                Image.asset(module['image']!, height: 50, width: 50),
-                const SizedBox(width: 15),
+                Image.asset(module['image'], height: 50, width: 50),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        module['title']!,
+                        module['title'],
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Row(
@@ -204,8 +235,7 @@ class _HomeScreenState extends State<HomeScreen>
                             style: const TextStyle(fontSize: 12),
                           ),
                           const SizedBox(width: 10),
-                          const Icon(Icons.play_circle_fill, size: 16),
-                          const SizedBox(width: 4),
+                          const Icon(Icons.timer, size: 14),
                           Text(
                             module['duration'] ?? '',
                             style: const TextStyle(fontSize: 12),
@@ -229,179 +259,152 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Image.asset(
-                  'assets/splashscreen_img_1.png',
-                  height: 113,
-                  width: 113,
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 20, 0),
-                  child: Row(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Image.asset('assets/splashscreen_img_1.png', scale: 3),
+                  Row(
                     children: [
                       Text(
-                        'Hi, $userName 👋',
+                        'Hi, $fullName 👋',
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Image.asset(
-                        'assets/HomeScreen_Profile.png',
-                        height: 40,
-                        width: 40,
+                      const SizedBox(width: 10),
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundImage:
+                            profileImageUrl.isNotEmpty
+                                ? NetworkImage(profileImageUrl)
+                                : const AssetImage(
+                                      'assets/HomeScreen_Profile.png',
+                                    )
+                                    as ImageProvider,
                       ),
                     ],
                   ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Image.asset('assets/HomeScreen_banner.png'),
+              const SizedBox(height: 10),
+              Container(
+                height: 120,
+                width: 330,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xffA8E8F9),
                 ),
-              ],
-            ),
-
-            Image.asset('assets/HomeScreen_banner.png', scale: 0.1),
-            const SizedBox(height: 20),
-
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Design Thinking Framework',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: const Color(0xffA8E8F9),
-              ),
-              height: 130,
-              width: 333,
-              child: Padding(
-                padding: const EdgeInsets.all(10.0),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Overall Mastery',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Icon(Icons.star, color: Colors.yellow),
-                      ],
+                    const Text(
+                      "Overall Mastery",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Text(
-                      'Unlock your greatness',
-                      style: TextStyle(fontSize: 10),
+                      "Unlock your greatness",
+                      style: TextStyle(fontSize: 12),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${((completed.length / (allModules.isNotEmpty ? allModules.length : 1)) * 100).toInt()}%',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     LinearProgressIndicator(
                       minHeight: 8,
-                      borderRadius: BorderRadius.circular(8),
-                      value: completed.length / 6,
-                      color: const Color(0xff8DF13F),
-                      backgroundColor: Colors.grey,
+                      value:
+                          completed.length /
+                          (allModules.isNotEmpty ? allModules.length : 1),
+                      backgroundColor: Colors.grey[300],
+                      color: Colors.green,
                     ),
-                    const SizedBox(height: 12),
                   ],
                 ),
               ),
-            ),
-
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Let's Start",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              const SizedBox(height: 20),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  "Let's Start",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
-
-            TabBar(
-              onTap: (index) {
-                setState(() {
-                  progress = (index == 0);
-                });
-              },
-              controller: _tabController,
-              indicatorColor: const Color(0xffE8505B),
-              labelColor: Colors.black,
-              unselectedLabelColor: Colors.grey,
-              labelStyle: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-              tabs: const [
-                Tab(text: "Modules"),
-                Tab(text: 'Ongoing'),
-                Tab(text: 'Completed'),
-              ],
-            ),
-
-            Expanded(
-              child: TabBarView(
+              TabBar(
                 controller: _tabController,
-                children: [
-                  // MODULES TAB
-                  _buildLessonList(
-                    allModules,
-                    actionIcon: Icons.play_circle,
-                    onTap: (title) {
-                      addToOngoing(title);
-                      widget.onModuleTap(title);
-                    },
-                  ),
-
-                  // ONGOING TAB
-                  _buildLessonList(
-                    ongoing
-                        .map(
-                          (e) => {
-                            "title": e,
-                            "lessons": "",
-                            "duration": "",
-                            "image": "assets/images/ob_img3.png",
-                          },
-                        )
-                        .toList(),
-                    actionIcon: Icons.play_circle_fill,
-                    iconColor: Colors.green,
-                    onTap: (title) {
-                      markAsCompleted(title);
-                      widget.onModuleTap(title);
-                    },
-                  ),
-
-                  // COMPLETED TAB
-                  _buildLessonList(
-                    completed
-                        .map(
-                          (e) => {
-                            "title": e,
-                            "lessons": "",
-                            "duration": "",
-                            "image": "assets/images/ob_img3.png",
-                          },
-                        )
-                        .toList(),
-                    actionIcon: Icons.check_circle,
-                    iconColor: Colors.blue,
-                  ),
+                indicatorColor: Colors.redAccent,
+                labelColor: Colors.black,
+                tabs: const [
+                  Tab(text: "Modules"),
+                  Tab(text: "Ongoing"),
+                  Tab(text: "Completed"),
                 ],
               ),
-            ),
-          ],
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildLessonList(
+                      allModules,
+                      onTap: (title) {
+                        widget.onModuleTap(title);
+                      },
+                    ),
+                    _buildLessonList(
+                      ongoing
+                          .map(
+                            (e) => {
+                              "title": e,
+                              "lessons": "",
+                              "duration": "",
+                              "image": "assets/images/ob_img3.png",
+                            },
+                          )
+                          .toList(),
+                      actionIcon: Icons.play_circle_fill,
+                      iconColor: Colors.orange,
+                      onTap: (title) {
+                        widget.onModuleTap(title);
+                      },
+                    ),
+                    _buildLessonList(
+                      completed
+                          .map(
+                            (e) => {
+                              "title": e,
+                              "lessons": "",
+                              "duration": "",
+                              "image": "assets/images/ob_img3.png",
+                            },
+                          )
+                          .toList(),
+                      actionIcon: Icons.check_circle,
+                      iconColor: Colors.green,
+                      onTap: (title) {
+                        widget.onModuleTap(title);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,7 +1,7 @@
-import 'package:design_thinking/phone_authentication/otp_input.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'otp_input.dart';
 
 class PhoneAuth extends StatefulWidget {
   const PhoneAuth({super.key});
@@ -19,7 +19,7 @@ class _PhoneAuthState extends State<PhoneAuth> {
     String rawPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
     String phoneNumber = "+91$rawPhone";
 
-    if (rawPhone.length < 10) {
+    if (rawPhone.length != 10) {
       _showErrorDialog("Please enter a valid 10-digit phone number.");
       return;
     }
@@ -30,17 +30,15 @@ class _PhoneAuthState extends State<PhoneAuth> {
 
     await _auth.verifyPhoneNumber(
       phoneNumber: phoneNumber,
-      verificationCompleted: (PhoneAuthCredential credential) {},
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Optional auto-verification
+      },
       verificationFailed: (FirebaseAuthException e) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         _showErrorDialog(e.message ?? 'Verification failed');
       },
       codeSent: (String verificationId, int? resendToken) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -52,11 +50,7 @@ class _PhoneAuthState extends State<PhoneAuth> {
           ),
         );
       },
-      codeAutoRetrievalTimeout: (String verificationId) {
-        setState(() {
-          _isLoading = false;
-        });
-      },
+      codeAutoRetrievalTimeout: (_) => setState(() => _isLoading = false),
     );
   }
 
@@ -69,7 +63,7 @@ class _PhoneAuthState extends State<PhoneAuth> {
             content: Text(message),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.pop(context),
                 child: const Text("OK"),
               ),
             ],
@@ -87,10 +81,9 @@ class _PhoneAuthState extends State<PhoneAuth> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
               child: Column(
-                spacing: 25,
                 children: [
-                  const SizedBox(),
-                  Image.asset("assets/images/otp.png", fit: BoxFit.contain),
+                  Image.asset("assets/images/otp.png"),
+                  const SizedBox(height: 20),
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
@@ -104,26 +97,17 @@ class _PhoneAuthState extends State<PhoneAuth> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: _sendOTP,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF75DBCE),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
-                      ),
                     ),
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 15,
-                      ),
+                      padding: EdgeInsets.all(15),
                       child: Text(
                         "Generate OTP",
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Colors.black,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(fontSize: 20, color: Colors.black),
                       ),
                     ),
                   ),

@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class VideoPlayScreen extends StatefulWidget {
   final String moduleName;
@@ -35,7 +36,31 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
   @override
   void initState() {
     super.initState();
-    fetchCompletedLessons().then((_) => loadVideo(currentIndex));
+    initializeModule();
+  }
+
+  Future<void> initializeModule() async {
+    await addToOngoingModulesIfNeeded();
+    await fetchCompletedLessons();
+    await loadResumeState();
+    await loadVideo(currentIndex);
+  }
+
+  Future<void> addToOngoingModulesIfNeeded() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final ongoingRef = FirebaseFirestore.instance
+        .collection("users")
+        .doc(user.uid)
+        .collection("ongoingModules");
+
+    final existing =
+        await ongoingRef.where("name", isEqualTo: widget.moduleName).get();
+
+    if (existing.docs.isEmpty) {
+      await ongoingRef.add({"name": widget.moduleName});
+    }
   }
 
   Future<void> fetchCompletedLessons() async {
@@ -57,16 +82,34 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
     }
   }
 
+  Future<void> loadResumeState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedIndex = prefs.getInt('${widget.moduleName}_index') ?? 0;
+    final savedPosition = prefs.getInt('${widget.moduleName}_position') ?? 0;
+
+    setState(() {
+      currentIndex = savedIndex;
+      resumeAtPosition = savedPosition.toDouble();
+    });
+  }
+
+  Future<void> saveLocalResume(int index, int positionSeconds) async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setInt('${widget.moduleName}_index', index);
+    prefs.setInt('${widget.moduleName}_position', positionSeconds);
+  }
+
+  Future<void> clearResumePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('${widget.moduleName}_index');
+    await prefs.remove('${widget.moduleName}_position');
+  }
+
   Future<void> loadVideo(int index) async {
     final lesson = widget.lessons[index];
     final name = lesson['title'];
 
-    // Show black screen while loading
-    setState(() {
-      isLoadingVideo = true;
-    });
-
-    // Cleanup existing player
+    setState(() => isLoadingVideo = true);
     await stopVideo();
 
     try {
@@ -78,7 +121,6 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       _videoController = VideoPlayerController.network(url);
       await _videoController!.initialize();
 
-      // Resume if applicable
       if (resumeAtPosition != null && index == currentIndex) {
         await _videoController!.seekTo(
           Duration(seconds: resumeAtPosition!.toInt()),
@@ -87,6 +129,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
 
       _videoListener = () async {
         if (!_videoController!.value.isInitialized || isDisposed) return;
+
         final isFinished =
             _videoController!.value.position >=
             _videoController!.value.duration;
@@ -95,9 +138,9 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
           await autoPlayNextLesson();
         }
 
-        // Save the current position
         final currentPosition = _videoController!.value.position.inSeconds;
         await saveVideoPosition(currentPosition);
+        await saveLocalResume(currentIndex, currentPosition);
       };
 
       _videoController!.addListener(_videoListener!);
@@ -111,43 +154,13 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       );
 
       if (mounted) {
-        setState(() {
-          isLoadingVideo = false;
-        });
+        setState(() => isLoadingVideo = false);
       }
     } catch (e) {
       print("Error loading video: $e");
       if (mounted) {
         setState(() => isLoadingVideo = false);
       }
-    }
-  }
-
-  Future<void> markModuleAsCompleted() async {
-    try {
-      final uid = FirebaseAuth.instance.currentUser!.uid;
-
-      // Add to completedModules
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('completedModules')
-          .add({'name': widget.moduleName});
-
-      // Remove from ongoingModules
-      QuerySnapshot ongoingSnapshot =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .collection('ongoingModules')
-              .where('name', isEqualTo: widget.moduleName)
-              .get();
-
-      for (var doc in ongoingSnapshot.docs) {
-        await doc.reference.delete();
-      }
-    } catch (e) {
-      print("Error marking module as completed from VideoPlayScreen: $e");
     }
   }
 
@@ -158,38 +171,6 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       'lastViewedModule': widget.moduleName,
       'lastLesson': widget.lessons[currentIndex]['title'],
     });
-  }
-
-  Future<void> stopVideo() async {
-    if (_videoListener != null) {
-      _videoController?.removeListener(_videoListener!);
-    }
-
-    // Pause video playback and dispose of the controllers
-    _chewieController?.pause();
-    _videoController?.pause();
-
-    // Dispose the controllers (no need to await, as dispose is void)
-    _chewieController?.dispose();
-    _videoController?.dispose();
-
-    // Clean up references
-    _chewieController = null;
-    _videoController = null;
-    _videoListener = null;
-  }
-
-  Future<void> autoPlayNextLesson() async {
-    if (currentIndex + 1 < widget.lessons.length) {
-      final nextIndex = currentIndex + 1;
-      final nextLessonTitle = widget.lessons[nextIndex - 1]['title'];
-
-      final isUnlocked = completedLessons.contains(nextLessonTitle);
-      if (isUnlocked || nextIndex == 0) {
-        setState(() => currentIndex = nextIndex);
-        await loadVideo(nextIndex);
-      }
-    }
   }
 
   Future<void> markLessonCompleted(String lessonName) async {
@@ -205,6 +186,61 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       if (mounted) setState(() {});
     } catch (e) {
       print("Error marking lesson completed: $e");
+    }
+  }
+
+  Future<void> markModuleAsCompleted() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final completedRef = FirebaseFirestore.instance
+        .collection("users")
+        .doc(user.uid)
+        .collection("completedModules");
+
+    final existing =
+        await completedRef.where("name", isEqualTo: widget.moduleName).get();
+
+    if (existing.docs.isEmpty) {
+      await completedRef.add({"name": widget.moduleName});
+    }
+
+    final ongoingRef = FirebaseFirestore.instance
+        .collection("users")
+        .doc(user.uid)
+        .collection("ongoingModules");
+
+    final ongoingSnap =
+        await ongoingRef.where("name", isEqualTo: widget.moduleName).get();
+
+    for (var doc in ongoingSnap.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  Future<void> stopVideo() async {
+    if (_videoListener != null) {
+      _videoController?.removeListener(_videoListener!);
+    }
+    _chewieController?.pause();
+    _videoController?.pause();
+    _chewieController?.dispose();
+    _videoController?.dispose();
+    _chewieController = null;
+    _videoController = null;
+    _videoListener = null;
+  }
+
+  Future<void> autoPlayNextLesson() async {
+    if (currentIndex + 1 < widget.lessons.length) {
+      final nextIndex = currentIndex + 1;
+      final prevLessonTitle = widget.lessons[nextIndex - 1]['title'];
+      final isUnlocked = completedLessons.contains(prevLessonTitle);
+
+      if (isUnlocked || nextIndex == 0) {
+        setState(() => currentIndex = nextIndex);
+        await loadVideo(nextIndex);
+      }
     }
   }
 
@@ -321,8 +357,7 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                     allLessonsCompleted
                         ? () async {
                           await stopVideo();
-
-                          // Call function to mark module completed
+                          await clearResumePrefs();
                           await markModuleAsCompleted();
 
                           int quizIndex = getQuizIndexForModule(
@@ -335,14 +370,12 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
                                   (context) => Quizsplash(
                                     lessonIndex: quizIndex,
                                     lessonTitle: widget.moduleName,
-                                    onComplete:
-                                        () => Home(), // or pop if you prefer
+                                    onComplete: () => Home(),
                                   ),
                             ),
                           );
                         }
                         : null,
-
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
                       allLessonsCompleted ? Colors.teal : Colors.grey,
@@ -377,6 +410,6 @@ int getQuizIndexForModule(String moduleName) {
     case 'Test':
       return 5;
     default:
-      return 0; // fallback
+      return 0;
   }
 }

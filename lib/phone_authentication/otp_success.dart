@@ -1,3 +1,4 @@
+import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/Login_screens/signup.dart';
 import 'package:flutter/material.dart';
 
@@ -40,7 +41,7 @@ class _OtpSuccessState extends State<OtpSuccess> {
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => Signup()),
+                      MaterialPageRoute(builder: (context) => Home()),
                     );
                   },
                   style: ElevatedButton.styleFrom(
