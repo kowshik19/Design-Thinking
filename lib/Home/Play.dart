@@ -1,4 +1,3 @@
-import 'package:design_thinking/Home/Account/Quiz.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/Quiz/quizsplash.dart';
 import 'package:flutter/material.dart';
@@ -50,17 +49,36 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final ongoingRef = FirebaseFirestore.instance
+    final userDocRef = FirebaseFirestore.instance
         .collection("users")
-        .doc(user.uid)
-        .collection("ongoingModules");
+        .doc(user.uid);
 
+    // ✅ Check if module is already marked as completed
+    final completedModuleSnapshot =
+        await userDocRef
+            .collection("completedModules")
+            .where("name", isEqualTo: widget.moduleName)
+            .get();
+
+    if (completedModuleSnapshot.docs.isNotEmpty) {
+      // If module is already completed, skip adding to ongoingModules
+      return;
+    }
+
+    // 🔄 Add to ongoingModules if not already there
+    final ongoingRef = userDocRef.collection("ongoingModules");
     final existing =
         await ongoingRef.where("name", isEqualTo: widget.moduleName).get();
 
     if (existing.docs.isEmpty) {
       await ongoingRef.add({"name": widget.moduleName});
     }
+
+    // 🔄 Update module status to "in progress"
+    await userDocRef.collection("moduleStatus").doc(widget.moduleName).set({
+      "status": "in progress",
+      "updatedAt": FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> fetchCompletedLessons() async {
@@ -216,6 +234,17 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
     for (var doc in ongoingSnap.docs) {
       await doc.reference.delete();
     }
+
+    // ✅ Mark the module as completed in moduleStatus
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user.uid)
+        .collection("moduleStatus")
+        .doc(widget.moduleName)
+        .set({
+          "status": "completed",
+          "updatedAt": FieldValue.serverTimestamp(),
+        });
   }
 
   Future<void> stopVideo() async {
@@ -311,7 +340,17 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
         return true;
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(widget.moduleName)),
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed:
+                () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => Home()),
+                ),
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+          ),
+          title: Text(widget.moduleName),
+        ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(12),
           child: Column(

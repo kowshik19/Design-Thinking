@@ -1,4 +1,5 @@
 import 'package:design_thinking/Login_screens/login.dart';
+import 'package:design_thinking/onboard_screens/s1.dart';
 import 'package:design_thinking/phone_authentication/phone_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -57,7 +58,7 @@ class LogoutScreen extends StatelessWidget {
                       FirebaseAuth.instance.signOut();
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => Login()),
+                        MaterialPageRoute(builder: (context) => S1()),
                       ); // Close dialog/ Navigate to login screen
                     },
                     style: ElevatedButton.styleFrom(

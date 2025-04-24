@@ -190,7 +190,9 @@ class _SignupState extends State<Signup> {
                       backgroundImage:
                           _profileImage != null
                               ? FileImage(_profileImage!)
-                              : const AssetImage('assets/default_avatar.png')
+                              : const AssetImage(
+                                    'assets/HomeScreen_Profile.png',
+                                  )
                                   as ImageProvider,
                       child:
                           _profileImage == null

@@ -1,5 +1,4 @@
 import 'package:design_thinking/Home/Account.dart';
-
 import 'package:design_thinking/Home/Homescreen.dart';
 import 'package:design_thinking/Home/Play.dart';
 import 'package:flutter/material.dart';
@@ -18,55 +17,39 @@ class _HomeState extends State<Home> {
   int _currentIndex = 0;
   String selectedFolder = "";
   bool isLoadingModule = true;
-
-  // Define your modules with lessons and their details
-  final List<Map<String, dynamic>> allModules = [
-    {
-      "title": "Introduction Of Design Thinking",
-      "lessons": [
-        {
-          'title': 'Introduction',
-          'duration': '5:00',
-          'description': 'An introduction to the basics of Design Thinking.',
-        },
-      ],
-      "duration": "30 Min",
-    },
-    {
-      "title": "Empathize",
-      "lessons": [
-        {
-          'title': 'Introduction',
-          'duration': '5:00',
-          'description': 'An introduction to the basics of Design Thinking.',
-        },
-        {
-          'title': 'What is Empathize',
-          'duration': '6:30',
-          'description':
-              'Learn what Empathy means in the context of Design Thinking.',
-        },
-        {
-          'title': 'Why Empathize',
-          'duration': '5:00',
-          'description':
-              'Understand the importance of Empathy in the design process.',
-        },
-        {
-          'title': 'How to Empathize',
-          'duration': '6:30',
-          'description':
-              'Step-by-step guide to practicing Empathy effectively in Design Thinking.',
-        },
-      ],
-      "duration": "45 Min",
-    },
-  ];
+  List<Map<String, dynamic>> allModules = [];
 
   @override
   void initState() {
     super.initState();
-    fetchLastViewedModule();
+    fetchModules().then((_) => fetchLastViewedModule());
+  }
+
+  Future<void> fetchModules() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('module').get();
+    List<Map<String, dynamic>> loadedModules = [];
+
+    for (final doc in snapshot.docs) {
+      final lessonsSnapshot = await doc.reference.collection('lessons').get();
+
+      final lessons =
+          lessonsSnapshot.docs.map((lessonDoc) {
+            return lessonDoc.data();
+          }).toList();
+
+      loadedModules.add({
+        'title': doc['title'],
+        'duration': doc['duration'],
+        'imageUrl': doc['imageUrl'],
+        'lessons': lessons,
+      });
+    }
+
+    setState(() {
+      allModules = loadedModules;
+      isLoadingModule = false;
+    });
   }
 
   Future<void> fetchLastViewedModule() async {
@@ -77,12 +60,11 @@ class _HomeState extends State<Home> {
       final data = doc.data();
       if (data != null && data['lastViewedModule'] != null) {
         selectedFolder = data['lastViewedModule'];
-      } else {
-        selectedFolder = allModules[0]['title']; // Default to the first module
+      } else if (allModules.isNotEmpty) {
+        selectedFolder = allModules[0]['title'];
       }
-    } else {
-      selectedFolder =
-          allModules[0]['title']; // Default if no user is signed in
+    } else if (allModules.isNotEmpty) {
+      selectedFolder = allModules[0]['title'];
     }
 
     setState(() => isLoadingModule = false);
@@ -91,9 +73,40 @@ class _HomeState extends State<Home> {
   Map<String, dynamic> getSelectedModule() {
     return allModules.firstWhere(
       (module) => module['title'] == selectedFolder,
-      orElse: () => allModules[0], // Default to the first module
+
+      orElse: () => allModules[0],
     );
   }
+
+  // Future<void> updateUserProgress(String moduleName, bool completed) async {
+  //   final uid = FirebaseAuth.instance.currentUser?.uid;
+  //   if (uid == null) return;
+
+  //   final userDoc = FirebaseFirestore.instance.collection('users').doc(uid);
+  //   final progressCollection = userDoc.collection('progress');
+
+  //   final existingSnapshot =
+  //       await progressCollection
+  //           .where('moduleName', isEqualTo: moduleName)
+  //           .get();
+
+  //   if (existingSnapshot.docs.isEmpty) {
+  //     await progressCollection.add({
+  //       'moduleName': moduleName,
+  //       'status': completed ? 'completed' : 'ongoing',
+  //       'timestamp': FieldValue.serverTimestamp(),
+  //     });
+  //   } else {
+  //     final docRef = existingSnapshot.docs.first.reference;
+  //     final existingStatus = existingSnapshot.docs.first.data()['status'];
+  //     if (existingStatus != 'completed' && completed) {
+  //       await docRef.update({
+  //         'status': 'completed',
+  //         'timestamp': FieldValue.serverTimestamp(),
+  //       });
+  //     }
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -103,21 +116,22 @@ class _HomeState extends State<Home> {
 
     final selectedModule = getSelectedModule();
 
-    // List of pages for navigation
     final List<Widget> _pages = [
       HomeScreen(
         onModuleTap: (folder) async {
           setState(() {
             selectedFolder = folder;
-            _currentIndex = 1; // Navigate to VideoPlayScreen
+            _currentIndex = 1;
           });
 
           final uid = FirebaseAuth.instance.currentUser?.uid;
           if (uid != null) {
-            await FirebaseFirestore.instance.collection('users').doc(uid).set(
-              {'lastViewedModule': folder},
-              SetOptions(merge: true),
-            ); // Merge to avoid overwriting other fields
+            await FirebaseFirestore.instance.collection('users').doc(uid).set({
+              'lastViewedModule': folder,
+            }, SetOptions(merge: true));
+
+            // Add to progress if not completed already
+            //  await updateUserProgress(folder, false);
           }
         },
       ),
@@ -139,7 +153,7 @@ class _HomeState extends State<Home> {
           color: Colors.black,
           activeColor: Colors.white,
           iconSize: 0,
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           tabBackgroundColor: const Color(0xff75DBCE),
           tabs: [
             GButton(
@@ -158,14 +172,6 @@ class _HomeState extends State<Home> {
               ),
               icon: Icons.search,
             ),
-            // GButton(
-            //   leading: Image.asset(
-            //     'assets/Nav/Vector.png',
-            //     width: 24,
-            //     height: 24,
-            //   ),
-            //   icon: Icons.play_arrow,
-            // ),
             GButton(
               leading: Image.asset(
                 'assets/Nav/Profile.png',

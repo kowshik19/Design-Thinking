@@ -8,7 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:open_file/open_file.dart';
-import 'package:flutter_pdfview/flutter_pdfview.dart'; // For Preview
+import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:intl/intl.dart';
 
 class CertificateGenerator extends StatefulWidget {
   const CertificateGenerator({super.key});
@@ -20,43 +21,58 @@ class CertificateGenerator extends StatefulWidget {
 class _CertificateGeneratorState extends State<CertificateGenerator> {
   String? _certificatePath;
   String? _previewPath;
-  String? _userName;
+  String? _fullName;
   bool _isLoading = true;
+  bool _isCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserName();
+    _checkCompletionAndFetchName();
   }
 
-  Future<void> _fetchUserName() async {
+  Future<void> _checkCompletionAndFetchName() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
       DocumentSnapshot userDoc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
+      String firstName = userDoc['firstName'] ?? '';
+      String lastName = userDoc['lastName'] ?? '';
+      String fullName = '$firstName $lastName'.trim();
+
+      DocumentSnapshot statusDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('moduleStatus')
+              .doc('Introduction Of Design Thinking')
+              .get();
+
+      bool completed =
+          (statusDoc.exists &&
+              statusDoc.data() != null &&
+              statusDoc['status'] == 'completed');
+
       setState(() {
-        _userName = userDoc['firstName'] ?? 'User';
+        _fullName = fullName;
+        _isCompleted = completed;
         _isLoading = false;
       });
     } catch (e) {
-      print("Error fetching user name: $e");
+      print("Error fetching data: $e");
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  Future<void> generateCertificate(
-    String name,
-    String course,
-    String date,
-  ) async {
+  Future<void> generateCertificate(String name) async {
     final pdf = pw.Document();
-
-    // Load certificate template image
     final ByteData bytes = await rootBundle.load('assets/template.png');
     final Uint8List byteList = bytes.buffer.asUint8List();
+
+    String formattedDate = DateFormat('MMMM dd, yyyy').format(DateTime.now());
 
     pdf.addPage(
       pw.Page(
@@ -64,30 +80,24 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
         build: (pw.Context context) {
           return pw.Stack(
             children: [
-              // Background Certificate Image
               pw.Positioned.fill(
                 child: pw.Image(pw.MemoryImage(byteList), fit: pw.BoxFit.cover),
               ),
-
               pw.Positioned(
                 left: 0,
                 right: 0,
-                top: 280, // Adjust this value based on your template
+                top: 280,
                 child: pw.Center(
-                  child: pw.Text(
-                    name,
-                    style: pw.TextStyle(
-                      fontSize: 35,
-                      fontWeight: pw.FontWeight.normal,
-                    ),
-                  ),
+                  child: pw.Text(name, style: pw.TextStyle(fontSize: 35)),
                 ),
               ),
-
               pw.Positioned(
                 left: 110,
                 top: 500,
-                child: pw.Text("$date", style: pw.TextStyle(fontSize: 16)),
+                child: pw.Text(
+                  formattedDate,
+                  style: pw.TextStyle(fontSize: 16),
+                ),
               ),
             ],
           );
@@ -95,7 +105,6 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       ),
     );
 
-    // Save the preview certificate as a temporary file
     final tempDir = await getTemporaryDirectory();
     final previewFile = File("${tempDir.path}/certificate_preview.pdf");
     await previewFile.writeAsBytes(await pdf.save());
@@ -104,7 +113,6 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       _previewPath = previewFile.path;
     });
 
-    // Show preview dialog
     _showPreviewDialog();
   }
 
@@ -113,17 +121,16 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.grey,
-          title: Text(""),
+          backgroundColor: Colors.grey[200],
+          title: const Text("Certificate Preview"),
           content:
               _previewPath == null
-                  ? CircularProgressIndicator()
-                  : Container(
+                  ? const CircularProgressIndicator()
+                  : SizedBox(
                     height: 400,
                     child: PDFView(
                       filePath: _previewPath!,
                       enableSwipe: true,
-                      swipeHorizontal: false,
                       autoSpacing: false,
                       pageSnap: true,
                       fitPolicy: FitPolicy.BOTH,
@@ -132,9 +139,7 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
                       },
                       onError: (error) {
                         print("Error loading PDF: $error");
-                        Navigator.pop(
-                          context,
-                        ); // Close the dialog if error occurs
+                        Navigator.pop(context);
                         _showErrorDialog();
                       },
                     ),
@@ -142,14 +147,17 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text("Cancel", style: TextStyle(color: Colors.black)),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: Colors.black),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
                 await saveCertificate();
                 Navigator.pop(context);
               },
-              child: Text("Save", style: TextStyle(color: Colors.black)),
+              child: const Text("Save", style: TextStyle(color: Colors.black)),
             ),
           ],
         );
@@ -176,12 +184,12 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Error"),
-          content: Text("Failed to load preview. Please try again."),
+          title: const Text("Error"),
+          content: const Text("Failed to load preview. Please try again."),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text("OK"),
+              child: const Text("OK"),
             ),
           ],
         );
@@ -196,104 +204,98 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         centerTitle: true,
-        title: Text("Certificate Generator", style: TextStyle(fontSize: 20)),
+        title: const Text(
+          "Certificate Generator",
+          style: TextStyle(fontSize: 20),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _isLoading
-                ? const CircularProgressIndicator()
-                : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Align(
-                        alignment: Alignment.center,
-                        child: const Text(
-                          "Click the below button \n to generate certificate",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (_isLoading)
+                const CircularProgressIndicator()
+              else ...[
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    "Click the below button \n to generate your certificate",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 60,
+                  width: 265,
+                  child: ElevatedButton(
+                    onPressed:
+                        _isCompleted && _fullName != null
+                            ? () => generateCertificate(_fullName!)
+                            : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff75DBCE),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Generate Certificate',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (_certificatePath != null)
+                  Card(
+                    color: Colors.green[50],
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 30,
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            "Certificate Generated!",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Saved at: $_certificatePath",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              if (_certificatePath != null) {
+                                OpenFile.open(_certificatePath);
+                              }
+                            },
+                            child: const Text("Open Certificate"),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                    ],
+                    ),
                   ),
-                ),
-            SizedBox(
-              height: 60,
-              width: 265,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (_userName != null) {
-                    generateCertificate(
-                      _userName!,
-                      "Design Thinking",
-                      "March 26, 2025",
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff75DBCE),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Generate Certificate',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_certificatePath != null)
-              Card(
-                color: Colors.green[50],
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 30,
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "Certificate Generated!",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        "Saved at: $_certificatePath",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (_certificatePath != null) {
-                            OpenFile.open(_certificatePath);
-                          }
-                        },
-                        child: const Text("Open Certificate"),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+              ],
+            ],
+          ),
         ),
       ),
     );

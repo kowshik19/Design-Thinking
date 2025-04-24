@@ -1,4 +1,6 @@
 import 'package:design_thinking/Home/Account/Quiz.dart';
+import 'package:design_thinking/Home/Home.dart';
+import 'package:design_thinking/Home/Play.dart';
 import 'package:flutter/material.dart';
 
 class QuizQuestionPage extends StatefulWidget {
@@ -769,10 +771,7 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                       const SizedBox(height: 15),
                       ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => Quiz()),
-                          );
+                          Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
@@ -783,7 +782,7 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                           ),
                         ),
                         child: const Text(
-                          "Return to Quiz Page",
+                          "Return to Home",
                           style: TextStyle(fontSize: 18),
                         ),
                       ),

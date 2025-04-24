@@ -3,6 +3,7 @@ import 'package:design_thinking/Home/Account/FAQ.dart';
 import 'package:design_thinking/Home/Account/Logout.dart';
 import 'package:design_thinking/Home/Account/Profile.dart';
 import 'package:design_thinking/Home/Account/Settings.dart';
+import 'package:design_thinking/Home/Home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ class Account extends StatefulWidget {
 }
 
 String fullName = "User"; // Default full name in case it is not found
+String userName = "User Name";
 
 class _AccountState extends State<Account> {
   // Variable to hold the user's profile image URL
@@ -46,7 +48,7 @@ class _AccountState extends State<Account> {
         // Check if the profileImageUrl, firstName, and lastName fields exist in Firestore document
         setState(() {
           profileImageUrl =
-              userData['profileImageUrl'] ??
+              userData['photoUrl'] ??
               null; // Default to null if field is missing
           String firstName =
               userData['firstName'] ??
@@ -55,6 +57,8 @@ class _AccountState extends State<Account> {
               userData['lastName'] ??
               "Last Name"; // Default to "Last Name" if field is missing
           fullName = "$firstName $lastName"; // Combine first and last name
+          String userid = userDoc['username'] ?? 'UserName';
+          userName = userid;
         });
       }
     }
@@ -65,6 +69,14 @@ class _AccountState extends State<Account> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        leading: IconButton(
+          onPressed:
+              () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => Home()),
+              ),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         title: const Text(
           'Account',
@@ -101,7 +113,7 @@ class _AccountState extends State<Account> {
                   height: constraints.maxHeight * 0.02,
                 ), // Adjusted height for spacing
                 Text(
-                  fullName, // Show full name (first name + last name)
+                  userName, // Show full name (first name + last name)
                   style: TextStyle(
                     fontSize: constraints.maxWidth * 0.05, // Scalable font size
                     fontWeight: FontWeight.w600,

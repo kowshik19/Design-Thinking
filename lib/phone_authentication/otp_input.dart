@@ -111,16 +111,17 @@ class _OtpInputState extends State<OtpInput> {
           children: [
             const SizedBox(height: 50),
             const Text(
-              "Enter OTP",
+              "Enter the OTP Recieved",
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
+            Image.asset("assets/images/inputOtp.png"),
             Pinput(
               controller: _otpController,
               length: 6,
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed: _verifyCode,
               style: ElevatedButton.styleFrom(

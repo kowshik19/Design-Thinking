@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -17,10 +17,12 @@ class _ProfileState extends State<Profile> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _schoolController = TextEditingController();
-  String? _profileImageUrl; // For storing the user's profile image URL
-  File? _selectedImage; // For storing the picked image file
-  bool _isPickingImage = false; // Flag to prevent multiple image picker dialogs
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  String? _profileImageUrl;
+  File? _selectedImage;
+  bool _isPickingImage = false;
+  bool _isLoading = false;
 
   final _formKey = GlobalKey<FormState>();
 
@@ -37,9 +39,9 @@ class _ProfileState extends State<Profile> {
         _lastNameController.text = userData['lastName'] ?? '';
         _emailController.text = userData['email'] ?? '';
         _dobController.text = userData['dob'] ?? '';
-        _schoolController.text = userData['school'] ?? '';
-        _profileImageUrl =
-            userData['profileImageUrl']; // Assuming the image URL is stored in Firestore
+        _usernameController.text = userData['username'] ?? '';
+        _phoneController.text = userData['phoneNumber'] ?? '';
+        _profileImageUrl = userData['photoUrl'];
         setState(() {});
       }
     } catch (e) {
@@ -113,6 +115,10 @@ class _ProfileState extends State<Profile> {
   // Update profile data in Firestore
   Future<void> _updateProfile() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
       try {
         String uid = FirebaseAuth.instance.currentUser!.uid;
 
@@ -124,13 +130,13 @@ class _ProfileState extends State<Profile> {
           imageUrl = await _uploadImage();
         }
 
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'firstName': _firstNameController.text,
           'lastName': _lastNameController.text,
           'email': _emailController.text,
           'dob': _dobController.text,
-          'school': _schoolController.text,
-          'profileImageUrl': imageUrl, // Save the new profile image URL
+          'username': _usernameController.text, // Allow editing the username
+          'photoUrl': imageUrl, // Save the new profile image URL
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -147,6 +153,10 @@ class _ProfileState extends State<Profile> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -172,103 +182,112 @@ class _ProfileState extends State<Profile> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(),
+              ) // Show a loading indicator while updating
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
 
-              // Profile Picture with Edit Option
-              Center(
-                child: Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    CircleAvatar(
-                      radius: 80,
-                      backgroundImage:
-                          _selectedImage != null
-                              ? FileImage(
-                                _selectedImage!,
-                              ) // Show the selected image
-                              : (_profileImageUrl != null
-                                  ? NetworkImage(
-                                    _profileImageUrl!,
-                                  ) // Show the image from Firestore
-                                  : const AssetImage(
-                                        "assets/HomeScreen_Profile.png",
-                                      )
-                                      as ImageProvider),
-                    ),
-                    IconButton(
-                      onPressed:
-                          _pickImage, // Allow the user to pick a new image
-                      icon: const Icon(Icons.edit, size: 30),
-                    ),
-                  ],
+                      // Profile Picture with Edit Option
+                      Center(
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 80,
+                              backgroundImage:
+                                  _selectedImage != null
+                                      ? FileImage(_selectedImage!)
+                                      : (_profileImageUrl != null
+                                          ? NetworkImage(_profileImageUrl!)
+                                          : const AssetImage(
+                                                "assets/HomeScreen_Profile.png",
+                                              )
+                                              as ImageProvider),
+                            ),
+                            IconButton(
+                              onPressed: _pickImage,
+                              icon: const Icon(Icons.edit, size: 30),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                      _buildLabel("Name"),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _firstNameController,
+                              hint: "First Name",
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _lastNameController,
+                              hint: "Last Name",
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      _buildLabel("Email"),
+                      const SizedBox(height: 6),
+                      _buildTextField(
+                        controller: _emailController,
+                        hint: "amar123@gmail.com",
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+
+                      const SizedBox(height: 16),
+                      _buildLabel("Date of Birth"),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () => _selectDate(context),
+                        child: AbsorbPointer(
+                          child: _buildTextField(
+                            controller: _dobController,
+                            hint: "Select your DOB",
+                            suffixIcon: const Icon(Icons.calendar_today),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+                      _buildLabel("Username"),
+                      const SizedBox(height: 6),
+                      _buildTextField(
+                        controller: _usernameController,
+                        hint: "Username",
+                      ),
+
+                      const SizedBox(height: 16),
+                      _buildLabel("Phone Number"),
+                      const SizedBox(height: 6),
+                      _buildTextField(
+                        controller: _phoneController,
+                        hint: "Phone Number",
+                        readOnly: true, // Disable editing
+                      ),
+
+                      const SizedBox(height: 26),
+                      Center(child: _buildButton()),
+                    ],
+                  ),
                 ),
               ),
-
-              const SizedBox(height: 20),
-              _buildLabel("Name"),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _firstNameController,
-                      hint: "First Name",
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _lastNameController,
-                      hint: "Last Name",
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-              _buildLabel("Email"),
-              const SizedBox(height: 6),
-              _buildTextField(
-                controller: _emailController,
-                hint: "amar123@gmail.com",
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 16),
-              _buildLabel("Date of Birth"),
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: () => _selectDate(context),
-                child: AbsorbPointer(
-                  child: _buildTextField(
-                    controller: _dobController,
-                    hint: "Select your DOB",
-                    suffixIcon: const Icon(Icons.calendar_today),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-              _buildLabel("School Name"),
-              const SizedBox(height: 6),
-              _buildTextField(
-                controller: _schoolController,
-                hint: "ABC School",
-              ),
-
-              const SizedBox(height: 26),
-              Center(child: _buildButton()),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -310,6 +329,7 @@ Widget _buildTextField({
   bool obscureText = false,
   Widget? suffixIcon,
   TextInputType keyboardType = TextInputType.text,
+  bool readOnly = false,
 }) {
   return Container(
     decoration: BoxDecoration(
@@ -326,6 +346,7 @@ Widget _buildTextField({
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      readOnly: readOnly,
       decoration: InputDecoration(
         fillColor: Colors.white,
         filled: true,
