@@ -240,10 +240,7 @@ class _SignupState extends State<Signup> {
                   ),
 
                   _buildLabel('Username'),
-                  _buildTextField(
-                    hint: 'e.g. arul_45',
-                    controller: _usernameController,
-                  ),
+                  _buildTextField(hint: '', controller: _usernameController),
 
                   _buildLabel('Password'),
                   _buildTextField(

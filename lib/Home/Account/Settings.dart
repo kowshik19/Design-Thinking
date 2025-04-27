@@ -1,5 +1,8 @@
 import 'package:design_thinking/Home/Account/AboutUs.dart';
+import 'package:design_thinking/Home/Account/QuizHistory.dart';
 import 'package:design_thinking/Login_screens/Forgot_password.dart';
+import 'package:design_thinking/firebase/upload_quiz_data.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class AccountSettings extends StatefulWidget {
@@ -29,7 +32,11 @@ class _AccountSettingsState extends State<AccountSettings> {
         children: [
           const SizedBox(height: 30),
           element_1(context, "Reset Password", screen: ForgotPassword()),
+          element_1(context, "Quiz History", screen: QuizHistory()),
           element_1(context, "About Us", screen: AboutUsPage()),
+          // Show admin option only in debug mode
+          if (kDebugMode)
+            element_1(context, "Admin: Upload Quiz Data", screen: UploadQuizData()),
         ],
       ),
     );

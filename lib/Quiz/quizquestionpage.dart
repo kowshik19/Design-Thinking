@@ -1,7 +1,11 @@
+import 'package:design_thinking/Home/Account/Certificate.dart';
 import 'package:design_thinking/Home/Account/Quiz.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/Home/Play.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
 
 class QuizQuestionPage extends StatefulWidget {
   final String lessonTitle;
@@ -21,625 +25,69 @@ class QuizQuestionPage extends StatefulWidget {
 
 class _QuizQuestionPageState extends State<QuizQuestionPage> {
   int currentQuestionIndex = 0;
-  final totalQuestions = 10;
   int score = 0;
   bool quizCompleted = false;
   int? selectedAnswerIndex;
+  bool isLoading = true;
+  List<Map<String, dynamic>> questions = [];
+  String? errorMessage;
+  final User? currentUser = FirebaseAuth.instance.currentUser;
+  // Define passing threshold (70%)
+  final double passingThreshold = 0.7;
 
-  final Map<int, List<Map<String, dynamic>>> quizQuestions = {
-    0: [
-      {
-        "question": "What is the first stage of the Design Thinking process?",
-        "options": ["Define", "Prototype", "Empathize", "Ideate"],
-        "answerIndex": 2,
-      },
-      {
-        "question": "Which stage focuses on generating a wide range of ideas?",
-        "options": ["Define", "Ideate", "Test", "Empathize"],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What is the main goal of the 'Define' phase?",
-        "options": [
-          "Understanding user needs",
-          "Framing the problem",
-          "Building a prototype",
-          "Testing the solution",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which method is commonly used in the 'Empathize' stage?",
-        "options": ["User interviews", "A/B testing", "Prototyping", "Coding"],
-        "answerIndex": 0,
-      },
-      {
-        "question": "Why is prototyping important in Design Thinking?",
-        "options": [
-          "To finalize the product",
-          "To gather user feedback",
-          "To increase costs",
-          "To skip testing",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What does 'HMW' stand for in Design Thinking?",
-        "options": [
-          "How Many Ways",
-          "High Market Worth",
-          "How Might We",
-          "Human Machine Workflow",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question":
-            "Which of the following is NOT a principle of Design Thinking?",
-        "options": [
-          "Human-centered approach",
-          "Iterative process",
-          "Ignoring user feedback",
-          "Creative problem-solving",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question":
-            "Which of the following is a key outcome of the 'Test' phase?",
-        "options": [
-          "Final product launch",
-          "User feedback for improvement",
-          "Skipping unnecessary changes",
-          "Immediate market release",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which company is known for promoting Design Thinking?",
-        "options": ["Apple", "IDEO", "Google", "Tesla"],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What is the primary purpose of Design Thinking?",
-        "options": [
-          "To create user-centric solutions",
-          "To focus only on business goals",
-          "To reduce creativity",
-          "To avoid problem-solving",
-        ],
-        "answerIndex": 0,
-      },
-    ],
+  @override
+  void initState() {
+    super.initState();
+    _fetchQuizQuestions();
+  }
 
-    1: [
-      {
-        "question":
-            "What is the primary goal of the Empathize phase in Design Thinking?",
-        "options": [
-          "Generating creative ideas",
-          "Understanding users and their needs",
-          "Building a prototype",
-          "Testing solutions",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question":
-            "Which of the following techniques is commonly used in the Empathize phase?",
-        "options": [
-          "User interviews",
-          "A/B testing",
-          "Unit testing",
-          "Prototyping",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "Why is empathy important in Design Thinking?",
-        "options": [
-          "It helps businesses focus only on profits",
-          "It ensures decisions are made based on assumptions",
-          "It helps designers understand user pain points",
-          "It removes the need for testing",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question":
-            "Which of the following is NOT a method used in the Empathize phase?",
-        "options": [
-          "Surveys",
-          "Observation",
-          "Storyboarding",
-          "Code debugging",
-        ],
-        "answerIndex": 3,
-      },
-      {
-        "question": "Which question is most relevant in the Empathize phase?",
-        "options": [
-          "What problem are we solving for users?",
-          "How can we market this product?",
-          "What technology should we use?",
-          "How can we increase profits?",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What is a user persona?",
-        "options": [
-          "A fictional character representing target users",
-          "A type of design prototype",
-          "A marketing strategy",
-          "A code library for UX design",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "How do designers gain insights in the Empathize phase?",
-        "options": [
-          "By analyzing user behavior and emotions",
-          "By skipping research and making assumptions",
-          "By directly coding a solution",
-          "By launching the final product first",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What is an example of empathizing with users?",
-        "options": [
-          "Conducting interviews to understand frustrations",
-          "Ignoring feedback to stick to the initial idea",
-          "Prioritizing company goals over user needs",
-          "Assuming all users have the same preferences",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Which of the following is a common mistake in the Empathize phase?",
-        "options": [
-          "Gathering diverse user insights",
-          "Using multiple research techniques",
-          "Making decisions based on assumptions",
-          "Observing real user interactions",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question": "How does empathy drive innovation in Design Thinking?",
-        "options": [
-          "By forcing users to change habits",
-          "By understanding real user problems and needs",
-          "By eliminating creativity in problem-solving",
-          "By avoiding user feedback",
-        ],
-        "answerIndex": 1,
-      },
-    ],
-    2: [
-      {
-        "question":
-            "What is the primary goal of the Define phase in Design Thinking?",
-        "options": [
-          "Generating a large number of ideas",
-          "Understanding the user's emotions",
-          "Clearly defining the problem statement",
-          "Building a working prototype",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question": "What is typically created at the end of the Define phase?",
-        "options": [
-          "A fully developed product",
-          "A problem statement",
-          "A prototype for testing",
-          "A marketing strategy",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which of the following best describes the Define stage?",
-        "options": [
-          "Observing and understanding users",
-          "Generating potential solutions",
-          "Refining and testing prototypes",
-          "Framing the core problem to be solved",
-        ],
-        "answerIndex": 3,
-      },
-      {
-        "question": "Which of these is a key outcome of the Define phase?",
-        "options": [
-          "A clear, actionable problem statement",
-          "A detailed technical specification",
-          "A finalized user interface design",
-          "A completed user interview report",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What is the primary input for the Define phase?",
-        "options": [
-          "User research data from the Empathize phase",
-          "Finalized product requirements",
-          "A working prototype",
-          "Marketing insights",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Which of the following is a common mistake in the Define phase?",
-        "options": [
-          "Reframing the problem statement based on user needs",
-          "Making assumptions without user research",
-          "Narrowing down a problem to focus on solutions",
-          "Synthesizing insights from user research",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question":
-            "Which technique is often used to define the problem in this stage?",
-        "options": [
-          "Storyboarding",
-          "Empathy mapping",
-          "Problem statement formulation",
-          "A/B testing",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question": "Why is defining the problem correctly important?",
-        "options": [
-          "It helps in identifying the right solutions",
-          "It eliminates the need for ideation",
-          "It speeds up the final product launch",
-          "It replaces the need for user feedback",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Which of the following is NOT a characteristic of a well-defined problem statement?",
-        "options": [
-          "Focused on user needs",
-          "Broad and vague",
-          "Clear and specific",
-          "Actionable",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What role does user persona play in the Define phase?",
-        "options": [
-          "Helps in understanding user needs and challenges",
-          "Eliminates the need for prototyping",
-          "Ensures only technical feasibility is considered",
-          "Directly replaces market research",
-        ],
-        "answerIndex": 0,
-      },
-    ],
-    3: [
-      {
-        "question":
-            "What is the primary goal of the Ideate stage in Design Thinking?",
-        "options": [
-          "Testing prototypes",
-          "Generating a wide range of creative ideas",
-          "Defining the problem statement",
-          "Understanding user needs",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question":
-            "Which of the following is a key activity in the Ideate stage?",
-        "options": [
-          "Brainstorming",
-          "User interviews",
-          "Market analysis",
-          "Bug fixing",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Why is quantity prioritized over quality in the Ideate stage?",
-        "options": [
-          "To ensure more ideas are generated before filtering",
-          "To finalize the best solution immediately",
-          "To avoid user feedback",
-          "To reduce creativity",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "Which technique is commonly used in the Ideate phase?",
-        "options": [
-          "A/B testing",
-          "Storyboarding",
-          "Brainwriting",
-          "Debugging",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question": "What should be avoided in the Ideate stage?",
-        "options": [
-          "Judging ideas too early",
-          "Encouraging creative thinking",
-          "Collaborating with team members",
-          "Exploring multiple solutions",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "Which of the following best describes the Ideate stage?",
-        "options": [
-          "Defining the user problem",
-          "Generating diverse solutions",
-          "Creating high-fidelity prototypes",
-          "Finalizing the best solution",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What is the main purpose of a brainstorming session?",
-        "options": [
-          "To analyze market trends",
-          "To develop a final prototype",
-          "To generate as many ideas as possible",
-          "To test user feedback",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question": "Which mindset is most important during the Ideate phase?",
-        "options": [
-          "Being open to all possibilities",
-          "Focusing on only one solution",
-          "Avoiding risks and creativity",
-          "Finalizing the product design",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Which of the following is an effective brainstorming rule?",
-        "options": [
-          "Criticize every idea",
-          "Encourage wild ideas",
-          "Focus only on one solution",
-          "Reject ideas that seem impossible",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What happens after the Ideate phase in Design Thinking?",
-        "options": [
-          "Prototyping the best ideas",
-          "Repeating the Define phase",
-          "Releasing the final product",
-          "Conducting market analysis",
-        ],
-        "answerIndex": 0,
-      },
-    ],
-    4: [
-      {
-        "question":
-            "What is the main objective of the Prototype stage in Design Thinking?",
-        "options": [
-          "To create a final product",
-          "To build testable representations of ideas",
-          "To generate as many ideas as possible",
-          "To analyze market competition",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which of the following best describes a prototype?",
-        "options": [
-          "A fully developed product",
-          "A preliminary version of a solution",
-          "A finalized UI/UX design",
-          "A theoretical model of the product",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Why is prototyping important in Design Thinking?",
-        "options": [
-          "It allows for early testing and feedback",
-          "It eliminates the need for user research",
-          "It helps in finalizing the design immediately",
-          "It removes the need for coding",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Which of the following is NOT a characteristic of a prototype?",
-        "options": [
-          "Interactive and testable",
-          "A representation of an idea",
-          "A final, polished product",
-          "Quick and inexpensive to create",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question":
-            "What type of prototype is created using paper sketches or wireframes?",
-        "options": [
-          "High-fidelity prototype",
-          "Low-fidelity prototype",
-          "Final product",
-          "Digital prototype",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which tool is commonly used for digital prototyping?",
-        "options": ["Adobe XD", "Notepad", "Microsoft Word", "Excel"],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What is the purpose of testing prototypes?",
-        "options": [
-          "To finalize the product for launch",
-          "To identify strengths and weaknesses of the design",
-          "To bypass user feedback",
-          "To develop the marketing strategy",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which of the following is a key benefit of prototyping?",
-        "options": [
-          "Reduces the risk of failure",
-          "Eliminates the need for further testing",
-          "Ensures instant market success",
-          "Prevents changes in the design",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What should be done after building a prototype?",
-        "options": [
-          "Immediately launch the product",
-          "Test it with real users",
-          "Discard the prototype",
-          "Skip to finalizing the design",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question":
-            "Which of the following is an example of a high-fidelity prototype?",
-        "options": [
-          "A hand-drawn wireframe",
-          "A clickable digital interface",
-          "A rough paper sketch",
-          "A written description of an idea",
-        ],
-        "answerIndex": 1,
-      },
-    ],
-    5: [
-      {
-        "question":
-            "What is the main objective of the Test stage in Design Thinking?",
-        "options": [
-          "To finalize the product for launch",
-          "To gather user feedback and refine the prototype",
-          "To generate as many ideas as possible",
-          "To define the problem statement",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "Which method is commonly used in the Test phase?",
-        "options": [
-          "A/B Testing",
-          "Brainstorming",
-          "Market Research",
-          "Storyboarding",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "Why is the Test stage important in Design Thinking?",
-        "options": [
-          "It helps validate the prototype with real users",
-          "It eliminates the need for future improvements",
-          "It ensures the product is complete and final",
-          "It replaces the need for prototyping",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What should be done if a prototype fails during testing?",
-        "options": [
-          "Launch it anyway",
-          "Iterate and refine based on feedback",
-          "Abandon the project",
-          "Ignore the test results",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question":
-            "Which of the following is NOT a best practice in the Test stage?",
-        "options": [
-          "Gathering unbiased user feedback",
-          "Observing users interact with the prototype",
-          "Assuming all users will behave the same way",
-          "Making changes based on test insights",
-        ],
-        "answerIndex": 2,
-      },
-      {
-        "question": "Who should ideally test the prototype?",
-        "options": [
-          "Only the design team",
-          "End users and stakeholders",
-          "Developers only",
-          "Marketing team",
-        ],
-        "answerIndex": 1,
-      },
-      {
-        "question": "What should be the focus when analyzing test results?",
-        "options": [
-          "Understanding user pain points and improving design",
-          "Proving that the design is perfect",
-          "Avoiding all future iterations",
-          "Convincing users that the design is correct",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question":
-            "Which type of feedback is most valuable in the Test phase?",
-        "options": [
-          "Constructive criticism from real users",
-          "Only positive feedback",
-          "Assumptions made by the design team",
-          "Random opinions from unrelated users",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "How can usability testing improve the final product?",
-        "options": [
-          "By identifying design flaws early",
-          "By skipping user validation",
-          "By reducing user involvement",
-          "By focusing only on aesthetics",
-        ],
-        "answerIndex": 0,
-      },
-      {
-        "question": "What is a key outcome of the Test phase?",
-        "options": [
-          "A finalized, market-ready product",
-          "Insights for improving the prototype",
-          "Elimination of all user testing",
-          "A completed business strategy",
-        ],
-        "answerIndex": 1,
-      },
-    ],
-  };
+  Future<void> _fetchQuizQuestions() async {
+    try {
+      setState(() {
+        isLoading = true;
+        errorMessage = null;
+      });
 
-  List<Map<String, dynamic>> get questions =>
-      quizQuestions[widget.lessonIndex] ?? [];
+      // Reference to the Firestore collection containing quiz questions
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('quizzes')
+          .where('lessonIndex', isEqualTo: widget.lessonIndex)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        setState(() {
+          errorMessage = "No questions found for this lesson.";
+          isLoading = false;
+        });
+        return;
+      }
+
+      // Parse the questions from Firestore
+      List<Map<String, dynamic>> fetchedQuestions = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data.containsKey('questions')) {
+          List<dynamic> questionsList = data['questions'];
+          for (var question in questionsList) {
+            fetchedQuestions.add(Map<String, dynamic>.from(question));
+          }
+        }
+      }
+      
+      // Shuffle the questions
+      fetchedQuestions.shuffle(Random());
+
+      setState(() {
+        questions = fetchedQuestions;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = "Failed to load questions: ${e.toString()}";
+        isLoading = false;
+      });
+    }
+  }
 
   void _nextQuestion() {
     if (selectedAnswerIndex != null) {
@@ -656,17 +104,108 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
     }
   }
 
-  void _submitQuiz() {
+  Future<void> _saveQuizScore() async {
+    try {
+      if (currentUser != null) {
+        final double percentage = (score / questions.length) * 100;
+        final bool passedQuiz = (score / questions.length) >= passingThreshold;
+        
+        // Save quiz score directly under user's document
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .collection('quiz_scores')
+            .add({
+          'lessonIndex': widget.lessonIndex,
+          'lessonTitle': widget.lessonTitle,
+          'score': score,
+          'totalQuestions': questions.length,
+          'percentage': percentage,
+          'passed': passedQuiz,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        
+        // If passed, update module completion status
+        if (passedQuiz) {
+          await _updateModuleCompletionStatus();
+        }
+      } else {
+        // Handle anonymous user or guest mode
+        // Create a device-specific ID for anonymous users
+        final String anonymousId = 'anonymous_${DateTime.now().millisecondsSinceEpoch}';
+        
+        await FirebaseFirestore.instance
+            .collection('anonymous_scores')
+            .doc(anonymousId)
+            .set({
+          'lessonIndex': widget.lessonIndex,
+          'lessonTitle': widget.lessonTitle,
+          'score': score,
+          'totalQuestions': questions.length,
+          'percentage': (score / questions.length) * 100,
+          'passed': (score / questions.length) >= passingThreshold,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print("Error saving quiz score: ${e.toString()}");
+    }
+  }
+  
+  Future<void> _updateModuleCompletionStatus() async {
+    if (currentUser == null) return;
+    
+    try {
+      // Map module index to module ID
+      final Map<int, String> moduleIds = {
+        0: 'introduction',
+        1: 'empathize',
+        2: 'define',
+        3: 'ideate',
+        4: 'prototype',
+        5: 'test'
+      };
+      
+      String moduleId = moduleIds[widget.lessonIndex] ?? 'unknown';
+      
+      // Update module status in user's document
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser!.uid)
+          .collection('moduleStatus')
+          .doc(moduleId)
+          .set({
+        'moduleId': moduleId,
+        'lessonIndex': widget.lessonIndex,
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+        'score': score,
+        'totalQuestions': questions.length,
+        'percentage': (score / questions.length) * 100,
+      }, SetOptions(merge: true));
+      
+    } catch (e) {
+      print("Error updating module status: ${e.toString()}");
+    }
+  }
+
+  void _submitQuiz() async {
     if (selectedAnswerIndex != null) {
       if (selectedAnswerIndex ==
           questions[currentQuestionIndex]["answerIndex"]) {
         score++;
       }
+      
+      // Save score to Firebase
+      await _saveQuizScore();
+      
+      final bool passedQuiz = (score / questions.length) >= passingThreshold;
+      
       setState(() {
         quizCompleted = true;
       });
 
-      widget.onQuizComplete(true);
+      widget.onQuizComplete(passedQuiz);
     }
   }
 
@@ -677,30 +216,24 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
       quizCompleted = false;
       selectedAnswerIndex = null;
     });
+    
+    // Shuffle questions for each attempt
+    questions.shuffle(Random());
   }
 
   @override
   Widget build(BuildContext context) {
     bool isLastQuestion = currentQuestionIndex == questions.length - 1;
     bool isFirstQuestion = currentQuestionIndex == 0;
+    
+    // Calculate if quiz is passed
+    bool isPassed = quizCompleted && ((score / questions.length) >= passingThreshold);
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.redAccent,
         elevation: 0,
-        // leading: IconButton(
-        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
-        //   onPressed: () {
-        //     // if (quizCompleted) {
-        //     //   widget.onQuizComplete(score >= 10);
-        //     // }
-        //     Navigator.push(
-        //       context,
-        //       MaterialPageRoute(builder: (context) => Quiz()),
-        //     );
-        //   },
-        // ),
         title: Text(
           widget.lessonTitle,
           style: const TextStyle(
@@ -711,6 +244,7 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
         ),
         centerTitle: true,
         actions: [
+          if (!isLoading && errorMessage == null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -727,8 +261,38 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child:
-              quizCompleted
+          child: isLoading
+              ? const CircularProgressIndicator()
+              : errorMessage != null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          errorMessage!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 18,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: _fetchQuizQuestions,
+                          child: const Text("Retry"),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text("Return to Home"),
+                        ),
+                      ],
+                    )
+                  : quizCompleted
                   ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -751,6 +315,38 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
+                            const SizedBox(height: 10),
+                            Text(
+                              "Percentage: ${((score / questions.length) * 100).toStringAsFixed(1)}%",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isPassed ? Colors.green : Colors.orange,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 15),
+                            Container(
+                              padding: const EdgeInsets.all(15),
+                              decoration: BoxDecoration(
+                                color: isPassed ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isPassed ? Colors.green : Colors.orange,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                isPassed
+                                    ? "Congratulations! You've passed this module quiz."
+                                    : "You need 70% or higher to pass this quiz.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: isPassed ? Colors.green : Colors.orange,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                       const SizedBox(height: 30),
                       ElevatedButton(
                         onPressed: _reattemptQuiz,
@@ -769,24 +365,67 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                         ),
                       ),
                       const SizedBox(height: 15),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const CertificateGenerator(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.card_membership, color: Colors.white),
+                            label: const Text(
+                              "View Certificates",
+                              style: TextStyle(fontSize: 16, color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 10,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          "Return to Home",
-                          style: TextStyle(fontSize: 18),
-                        ),
+                          const SizedBox(width: 10),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const Home(),
+                                ),
+                                (route) => false,
+                              );
+                            },
+                            icon: const Icon(Icons.home, color: Colors.white),
+                            label: const Text(
+                              "Go to Home",
+                              style: TextStyle(fontSize: 16, color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
+                        )
+                      : questions.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "No questions available for this lesson",
+                                style: TextStyle(fontSize: 18),
+                              ),
                   )
                   : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -850,7 +489,7 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                             const SizedBox(width: 100),
                           if (!isLastQuestion)
                             ElevatedButton(
-                              onPressed: _nextQuestion,
+                                        onPressed: selectedAnswerIndex != null ? _nextQuestion : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     selectedAnswerIndex != null
@@ -870,7 +509,7 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                             )
                           else
                             ElevatedButton(
-                              onPressed: _submitQuiz,
+                                        onPressed: selectedAnswerIndex != null ? _submitQuiz : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     selectedAnswerIndex != null

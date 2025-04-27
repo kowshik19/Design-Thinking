@@ -80,8 +80,7 @@ class _QuizsplashState extends State<Quizsplash> {
                               lessonIndex: widget.lessonIndex,
                               onQuizComplete: (bool isCompleted) {
                                 if (isCompleted) {
-                                  widget
-                                      .onComplete(); // ✅ Update module page only when all questions are done
+                                  widget.onComplete();
                                 }
                               },
                             ),

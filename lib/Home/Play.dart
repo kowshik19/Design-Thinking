@@ -134,6 +134,9 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       final ref = FirebaseStorage.instance.ref().child(
         '${widget.moduleName}/$name.mp4',
       );
+      print("Hi${widget.moduleName}");
+      print('Fetching from path: ${widget.moduleName}/$name.mp4');
+
       final url = await ref.getDownloadURL();
 
       _videoController = VideoPlayerController.network(url);

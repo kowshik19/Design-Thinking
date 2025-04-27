@@ -23,16 +23,35 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
   String? _previewPath;
   String? _fullName;
   bool _isLoading = true;
-  bool _isCompleted = false;
+  List<Map<String, dynamic>> _moduleStatus = [];
+
+  // List of all modules in the course
+  final List<Map<String, dynamic>> _allModules = [
+    {
+      'id': 'introduction',
+      'title': 'Introduction to Design Thinking',
+      'index': 0,
+    },
+    {'id': 'empathize', 'title': 'Empathize', 'index': 1},
+    {'id': 'define', 'title': 'Define', 'index': 2},
+    {'id': 'ideate', 'title': 'Ideate', 'index': 3},
+    {'id': 'prototype', 'title': 'Prototype', 'index': 4},
+    {'id': 'test', 'title': 'Test', 'index': 5},
+  ];
 
   @override
   void initState() {
     super.initState();
-    _checkCompletionAndFetchName();
+    _fetchUserDataAndModuleStatus();
   }
 
-  Future<void> _checkCompletionAndFetchName() async {
+  Future<void> _fetchUserDataAndModuleStatus() async {
     try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Fetch user name
       String uid = FirebaseAuth.instance.currentUser!.uid;
       DocumentSnapshot userDoc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
@@ -41,22 +60,57 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       String lastName = userDoc['lastName'] ?? '';
       String fullName = '$firstName $lastName'.trim();
 
-      DocumentSnapshot statusDoc =
+      // Prepare module status list with completion data
+      List<Map<String, dynamic>> moduleStatusList = [];
+
+      // Fetch quiz scores to determine completion status
+      QuerySnapshot quizScores =
           await FirebaseFirestore.instance
               .collection('users')
               .doc(uid)
-              .collection('moduleStatus')
-              .doc('Introduction Of Design Thinking')
+              .collection('quiz_scores')
+              .orderBy('timestamp', descending: true)
               .get();
 
-      bool completed =
-          (statusDoc.exists &&
-              statusDoc.data() != null &&
-              statusDoc['status'] == 'completed');
+      // Create a map to track highest scores for each module
+      Map<int, int> highestScores = {};
+      Map<int, int> totalQuestions = {};
+
+      // Process quiz scores
+      for (var doc in quizScores.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        int lessonIndex = data['lessonIndex'] ?? 0;
+        int score = data['score'] ?? 0;
+        int total = data['totalQuestions'] ?? 10;
+
+        if (!highestScores.containsKey(lessonIndex) ||
+            highestScores[lessonIndex]! < score) {
+          highestScores[lessonIndex] = score;
+          totalQuestions[lessonIndex] = total;
+        }
+      }
+
+      // Check module completion status based on quiz scores
+      for (var module in _allModules) {
+        int moduleIndex = module['index'];
+        bool isCompleted =
+            highestScores.containsKey(moduleIndex) &&
+            (highestScores[moduleIndex]! / totalQuestions[moduleIndex]!) >=
+                0.7; // 70% passing score
+
+        moduleStatusList.add({
+          'id': module['id'],
+          'title': module['title'],
+          'index': moduleIndex,
+          'isCompleted': isCompleted,
+          'highestScore': highestScores[moduleIndex] ?? 0,
+          'totalQuestions': totalQuestions[moduleIndex] ?? 10,
+        });
+      }
 
       setState(() {
         _fullName = fullName;
-        _isCompleted = completed;
+        _moduleStatus = moduleStatusList;
         _isLoading = false;
       });
     } catch (e) {
@@ -67,7 +121,11 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
     }
   }
 
-  Future<void> generateCertificate(String name) async {
+  Future<void> generateCertificate(
+    String name,
+    String moduleTitle,
+    int moduleIndex,
+  ) async {
     final pdf = pw.Document();
     final ByteData bytes = await rootBundle.load('assets/template.png');
     final Uint8List byteList = bytes.buffer.asUint8List();
@@ -92,6 +150,31 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
                 ),
               ),
               pw.Positioned(
+                left: 0,
+                right: 0,
+                top: 340,
+                child: pw.Center(
+                  child: pw.Text(
+                    "for successfully completing the module:",
+                    style: pw.TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+              pw.Positioned(
+                left: 0,
+                right: 0,
+                top: 370,
+                child: pw.Center(
+                  child: pw.Text(
+                    moduleTitle,
+                    style: pw.TextStyle(
+                      fontSize: 22,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              pw.Positioned(
                 left: 110,
                 top: 500,
                 child: pw.Text(
@@ -106,23 +189,25 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
     );
 
     final tempDir = await getTemporaryDirectory();
-    final previewFile = File("${tempDir.path}/certificate_preview.pdf");
+    final previewFile = File(
+      "${tempDir.path}/certificate_${moduleIndex}_preview.pdf",
+    );
     await previewFile.writeAsBytes(await pdf.save());
 
     setState(() {
       _previewPath = previewFile.path;
     });
 
-    _showPreviewDialog();
+    _showPreviewDialog(moduleTitle, moduleIndex);
   }
 
-  void _showPreviewDialog() {
+  void _showPreviewDialog(String moduleTitle, int moduleIndex) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[200],
-          title: const Text("Certificate Preview"),
+          title: Text("$moduleTitle Certificate Preview"),
           content:
               _previewPath == null
                   ? const CircularProgressIndicator()
@@ -154,7 +239,7 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
             ),
             ElevatedButton(
               onPressed: () async {
-                await saveCertificate();
+                await saveCertificate(moduleTitle, moduleIndex);
                 Navigator.pop(context);
               },
               child: const Text("Save", style: TextStyle(color: Colors.black)),
@@ -165,11 +250,13 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
     );
   }
 
-  Future<void> saveCertificate() async {
+  Future<void> saveCertificate(String moduleTitle, int moduleIndex) async {
     if (_previewPath == null) return;
 
     final output = await getApplicationDocumentsDirectory();
-    final savedFile = File("${output.path}/certificate.pdf");
+    final fileName =
+        "certificate_${moduleTitle.replaceAll(' ', '_').toLowerCase()}.pdf";
+    final savedFile = File("${output.path}/$fileName");
     await File(_previewPath!).copy(savedFile.path);
 
     setState(() {
@@ -209,95 +296,169 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
           style: TextStyle(fontSize: 20),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SizedBox(
-          width: double.infinity,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (_isLoading)
-                const CircularProgressIndicator()
-              else ...[
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    "Click the below button \n to generate your certificate",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 60,
-                  width: 265,
-                  child: ElevatedButton(
-                    onPressed:
-                        _isCompleted && _fullName != null
-                            ? () => generateCertificate(_fullName!)
-                            : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff75DBCE),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Available Certificates",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    child: const Text(
-                      'Generate Certificate',
-                      style: TextStyle(fontSize: 16),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Complete a module quiz with at least 70% score to unlock its certificate",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                if (_certificatePath != null)
-                  Card(
-                    color: Colors.green[50],
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: _moduleStatus.length,
+                        itemBuilder: (context, index) {
+                          final module = _moduleStatus[index];
+                          final bool isCompleted = module['isCompleted'];
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color:
+                                    isCompleted
+                                        ? Colors.green
+                                        : Colors.grey.shade300,
+                                width: isCompleted ? 2 : 1,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        isCompleted
+                                            ? Icons.check_circle
+                                            : Icons.lock,
+                                        color:
+                                            isCompleted
+                                                ? Colors.green
+                                                : Colors.grey,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          module['title'],
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color:
+                                                isCompleted
+                                                    ? Colors.black
+                                                    : Colors.grey,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    isCompleted
+                                        ? "Best Score: ${module['highestScore']}/${module['totalQuestions']} (${((module['highestScore'] / module['totalQuestions']) * 100).toStringAsFixed(1)}%)"
+                                        : "Complete the quiz to unlock this certificate",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color:
+                                          isCompleted
+                                              ? Colors.black
+                                              : Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed:
+                                          isCompleted && _fullName != null
+                                              ? () => generateCertificate(
+                                                _fullName!,
+                                                module['title'],
+                                                module['index'],
+                                              )
+                                              : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xff75DBCE,
+                                        ),
+                                        foregroundColor: Colors.black,
+                                        disabledBackgroundColor:
+                                            Colors.grey.shade300,
+                                      ),
+                                      child: Text(
+                                        isCompleted
+                                            ? "Generate Certificate"
+                                            : "Certificate Locked",
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 30,
+                    if (_certificatePath != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: Card(
+                          color: Colors.green[50],
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            "Certificate Generated!",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 30,
+                                ),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  "Certificate Generated!",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    if (_certificatePath != null) {
+                                      OpenFile.open(_certificatePath);
+                                    }
+                                  },
+                                  child: const Text("Open Certificate"),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            "Saved at: $_certificatePath",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              if (_certificatePath != null) {
-                                OpenFile.open(_certificatePath);
-                              }
-                            },
-                            child: const Text("Open Certificate"),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ),
+                  ],
+                ),
+              ),
     );
   }
 }
