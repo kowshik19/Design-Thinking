@@ -105,10 +105,12 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
     final savedIndex = prefs.getInt('${widget.moduleName}_index') ?? 0;
     final savedPosition = prefs.getInt('${widget.moduleName}_position') ?? 0;
 
-    setState(() {
-      currentIndex = savedIndex;
-      resumeAtPosition = savedPosition.toDouble();
-    });
+    if (mounted) {
+      setState(() {
+        currentIndex = savedIndex;
+        resumeAtPosition = savedPosition.toDouble();
+      });
+    }
   }
 
   Future<void> saveLocalResume(int index, int positionSeconds) async {
@@ -127,19 +129,26 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
     final lesson = widget.lessons[index];
     final name = lesson['title'];
 
-    setState(() => isLoadingVideo = true);
+    if (mounted) {
+      setState(() => isLoadingVideo = true);
+    }
     await stopVideo();
 
     try {
-      final ref = FirebaseStorage.instance.ref().child(
-        '${widget.moduleName}/$name.mp4',
-      );
-      print("Hi${widget.moduleName}");
-      print('Fetching from path: ${widget.moduleName}/$name.mp4');
+      // Use the videoUrl directly from the lesson data
+      final String? videoUrl = lesson['videoUrl'];
 
-      final url = await ref.getDownloadURL();
+      if (videoUrl == null || videoUrl.isEmpty) {
+        print('Video URL not found for ${widget.moduleName}/$name');
+        if (mounted) {
+          setState(() => isLoadingVideo = false);
+        }
+        return;
+      }
 
-      _videoController = VideoPlayerController.network(url);
+      print('Loading video from URL: $videoUrl');
+
+      _videoController = VideoPlayerController.network(videoUrl);
       await _videoController!.initialize();
 
       if (resumeAtPosition != null && index == currentIndex) {
@@ -219,13 +228,21 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
         .doc(user.uid)
         .collection("completedModules");
 
-    final existing =
-        await completedRef.where("name", isEqualTo: widget.moduleName).get();
+    final docId = widget.moduleName.replaceAll(' ', '_');
+    
+    // Check if already exists
+    final existingDoc = await completedRef.doc(docId).get();
+    
+    // Save with both name and title for compatibility
+    await completedRef.doc(docId).set({
+      "name": widget.moduleName,
+      "title": widget.moduleName,
+      "completedAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    
+    print("Marked module as completed: ${widget.moduleName}");
 
-    if (existing.docs.isEmpty) {
-      await completedRef.add({"name": widget.moduleName});
-    }
-
+    // Remove from ongoingModules
     final ongoingRef = FirebaseFirestore.instance
         .collection("users")
         .doc(user.uid)
@@ -270,7 +287,9 @@ class _VideoPlayScreenState extends State<VideoPlayScreen> {
       final isUnlocked = completedLessons.contains(prevLessonTitle);
 
       if (isUnlocked || nextIndex == 0) {
-        setState(() => currentIndex = nextIndex);
+        if (mounted) {
+          setState(() => currentIndex = nextIndex);
+        }
         await loadVideo(nextIndex);
       }
     }

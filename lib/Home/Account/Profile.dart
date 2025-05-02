@@ -206,7 +206,8 @@ class _ProfileState extends State<Profile> {
                               backgroundImage:
                                   _selectedImage != null
                                       ? FileImage(_selectedImage!)
-                                      : (_profileImageUrl != null
+                                      : (_profileImageUrl != null &&
+                                              _profileImageUrl!.isNotEmpty
                                           ? NetworkImage(_profileImageUrl!)
                                           : const AssetImage(
                                                 "assets/HomeScreen_Profile.png",

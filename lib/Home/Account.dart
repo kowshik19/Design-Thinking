@@ -101,7 +101,7 @@ class _AccountState extends State<Account> {
                   child: CircleAvatar(
                     radius: constraints.maxWidth * 0.2, // 20% of screen width
                     backgroundImage:
-                        profileImageUrl != null
+                        profileImageUrl != null && profileImageUrl!.isNotEmpty
                             ? NetworkImage(
                               profileImageUrl!,
                             ) // Display profile image from Firebase
@@ -136,7 +136,7 @@ class _AccountState extends State<Account> {
                         CertificateGenerator(),
                         constraints,
                       ),
-                      element_1("FAQ’s", FAQ(), constraints),
+                      element_1("FAQ's", FAQ(), constraints),
                       element_1("Logout", LogoutScreen(), constraints),
                     ],
                   ),

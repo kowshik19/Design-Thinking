@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:design_thinking/Home/Home.dart';
 import 'package:design_thinking/firebase/auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -36,6 +37,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+
     Timer(Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,

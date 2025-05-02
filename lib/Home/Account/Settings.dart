@@ -34,9 +34,9 @@ class _AccountSettingsState extends State<AccountSettings> {
           element_1(context, "Reset Password", screen: ForgotPassword()),
           element_1(context, "Quiz History", screen: QuizHistory()),
           element_1(context, "About Us", screen: AboutUsPage()),
-          // Show admin option only in debug mode
-          if (kDebugMode)
-            element_1(context, "Admin: Upload Quiz Data", screen: UploadQuizData()),
+          // // Show admin option only in debug mode
+          // if (kDebugMode)
+          //   element_1(context, "Admin: Upload Quiz Data", screen: UploadQuizData()),
         ],
       ),
     );

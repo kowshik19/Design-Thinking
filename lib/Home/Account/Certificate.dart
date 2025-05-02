@@ -63,6 +63,26 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       // Prepare module status list with completion data
       List<Map<String, dynamic>> moduleStatusList = [];
 
+      // Fetch completed modules directly
+      QuerySnapshot completedModules =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('completedModules')
+              .get();
+
+      // Create a set of completed module titles from the completedModules collection
+      Set<String> completedModuleTitles = {};
+      for (var doc in completedModules.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        // Check both title and name fields
+        if (data.containsKey('title')) {
+          completedModuleTitles.add(data['title'].toString());
+        } else if (data.containsKey('name')) {
+          completedModuleTitles.add(data['name'].toString());
+        }
+      }
+
       // Fetch quiz scores to determine completion status
       QuerySnapshot quizScores =
           await FirebaseFirestore.instance
@@ -75,32 +95,51 @@ class _CertificateGeneratorState extends State<CertificateGenerator> {
       // Create a map to track highest scores for each module
       Map<int, int> highestScores = {};
       Map<int, int> totalQuestions = {};
+      Map<String, bool> modulePassedByTitle = {};
 
       // Process quiz scores
       for (var doc in quizScores.docs) {
         final data = doc.data() as Map<String, dynamic>;
+        // Handle both by index and by title
         int lessonIndex = data['lessonIndex'] ?? 0;
+        String moduleTitle = data['moduleTitle']?.toString() ?? '';
         int score = data['score'] ?? 0;
         int total = data['totalQuestions'] ?? 10;
+        bool passed = data['passed'] ?? false;
 
+        // Track by index
         if (!highestScores.containsKey(lessonIndex) ||
             highestScores[lessonIndex]! < score) {
           highestScores[lessonIndex] = score;
           totalQuestions[lessonIndex] = total;
         }
+
+        // Also track by title
+        if (moduleTitle.isNotEmpty) {
+          if (passed) {
+            modulePassedByTitle[moduleTitle] = true;
+          }
+        }
       }
 
-      // Check module completion status based on quiz scores
+      // Check module completion status based on quiz scores and completed modules
       for (var module in _allModules) {
         int moduleIndex = module['index'];
-        bool isCompleted =
-            highestScores.containsKey(moduleIndex) &&
-            (highestScores[moduleIndex]! / totalQuestions[moduleIndex]!) >=
-                0.7; // 70% passing score
+        String moduleTitle = module['title'];
+        
+        // Module is completed if:
+        // 1. It's in the completedModules collection, OR
+        // 2. It passed a quiz with 70% or higher, OR
+        // 3. It's marked as passed in the quiz_scores
+        bool isCompleted = 
+            completedModuleTitles.contains(moduleTitle) ||
+            modulePassedByTitle[moduleTitle] == true ||
+            (highestScores.containsKey(moduleIndex) &&
+            (highestScores[moduleIndex]! / totalQuestions[moduleIndex]!) >= 0.7);
 
         moduleStatusList.add({
           'id': module['id'],
-          'title': module['title'],
+          'title': moduleTitle,
           'index': moduleIndex,
           'isCompleted': isCompleted,
           'highestScore': highestScores[moduleIndex] ?? 0,

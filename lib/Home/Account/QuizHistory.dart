@@ -49,9 +49,20 @@ class _QuizHistoryState extends State<QuizHistory> {
       List<Map<String, dynamic>> history = [];
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
+        
+        // First check if moduleTitle exists, and only if not, use lessonTitle or default
+        String title = data['moduleTitle']?.toString() ?? 
+                      data['lessonTitle']?.toString() ?? 
+                      'Unknown Lesson';
+        
+        // Handle empty string case
+        if (title.trim().isEmpty) {
+          title = 'Unknown Lesson';
+        }
+                    
         history.add({
           'id': doc.id,
-          'lessonTitle': data['lessonTitle'] ?? 'Unknown Lesson',
+          'lessonTitle': title,
           'lessonIndex': data['lessonIndex'] ?? 0,
           'score': data['score'] ?? 0,
           'totalQuestions': data['totalQuestions'] ?? 10,
@@ -67,11 +78,19 @@ class _QuizHistoryState extends State<QuizHistory> {
         quizScores = history;
         isLoading = false;
       });
+      
+      // Print for debugging
+      print("Loaded ${quizScores.length} quiz records from history");
+      for (var quiz in quizScores) {
+        print("Quiz: ${quiz['lessonTitle']} - Score: ${quiz['score']}/${quiz['totalQuestions']}");
+      }
     } catch (e) {
       setState(() {
         errorMessage = "Failed to load quiz history: ${e.toString()}";
         isLoading = false;
       });
+      print("Quiz history error: $e");
+      print(StackTrace.current); // Print stack trace for better debugging
     }
   }
 
@@ -173,6 +192,8 @@ class _QuizHistoryState extends State<QuizHistory> {
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
                                                 ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],

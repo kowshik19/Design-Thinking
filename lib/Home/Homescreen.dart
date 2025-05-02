@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
 
 class HomeScreen extends StatefulWidget {
   final Function(String) onModuleTap;
@@ -35,12 +36,11 @@ class _HomeScreenState extends State<HomeScreen>
       isLoading = true;
     });
 
-    await Future.wait([
-      fetchUserData(),
-      fetchModules(),
-      fetchOngoingModules(),
-      fetchCompletedModules(),
-    ]);
+    // First fetch user data and modules
+    await Future.wait([fetchUserData(), fetchModules()]);
+
+    // Then fetch ongoing and completed modules (which depend on allModules)
+    await Future.wait([fetchOngoingModules(), fetchCompletedModules()]);
 
     setState(() {
       isLoading = false;
@@ -116,8 +116,43 @@ class _HomeScreenState extends State<HomeScreen>
               .doc(uid)
               .collection('completedModules')
               .get();
+
+      // Use a Set to avoid duplicate module names
+      Set<String> completedModulesSet = {};
+
+      for (var doc in query.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        // Check for both 'name' and 'title' fields to be more robust
+        if (data.containsKey('title')) {
+          completedModulesSet.add(data['title'].toString());
+        } else if (data.containsKey('name')) {
+          completedModulesSet.add(data['name'].toString());
+        } else {
+          // If neither field exists, try to use the document ID as a fallback
+          completedModulesSet.add(doc.id.replaceAll('_', ' '));
+        }
+      }
+
+      // Convert to list and ensure we don't have more completed modules than exist
+      List<String> completedModulesList = completedModulesSet.toList();
+
+      // Filter out any completed modules that aren't in the allModules list
+      List<String> validCompletedModules = [];
+      Set<String> allModuleTitles =
+          allModules.map((m) => m['title'].toString()).toSet();
+
+      for (var module in completedModulesList) {
+        if (allModuleTitles.contains(module)) {
+          validCompletedModules.add(module);
+        }
+      }
+
       setState(() {
-        completed = query.docs.map((doc) => doc['name'].toString()).toList();
+        completed = validCompletedModules;
+        // Print for debugging
+        print(
+          "Found ${completed.length} completed modules out of ${allModules.length}: $completed",
+        );
       });
     } catch (e) {
       print("Completed fetch error: $e");
@@ -328,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
                         children: [
                           Image.asset(
                             'assets/splashscreen_img_1.png',
-                            height: 100,
+                            scale: 3,
                           ),
                           Row(
                             children: [
@@ -358,15 +393,13 @@ class _HomeScreenState extends State<HomeScreen>
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: Colors.grey[200],
+                                  radius: 20,
                                   backgroundImage:
                                       profileImageUrl.isNotEmpty
                                           ? NetworkImage(profileImageUrl)
                                           : const AssetImage(
-                                                'assets/HomeScreen_Profile.png',
-                                              )
-                                              as ImageProvider,
+                                              'assets/HomeScreen_Profile.png',
+                                            ) as ImageProvider<Object>,
                                 ),
                               ),
                             ],
@@ -442,7 +475,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
-                                    '${((completed.length / (allModules.isNotEmpty ? allModules.length : 1)) * 100).toInt()}%',
+                                    '${(min((completed.length / (allModules.isNotEmpty ? allModules.length : 1)), 1.0) * 100).toInt()}%',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -457,11 +490,13 @@ class _HomeScreenState extends State<HomeScreen>
                               borderRadius: BorderRadius.circular(10),
                               child: LinearProgressIndicator(
                                 minHeight: 10,
-                                value:
-                                    completed.length /
-                                    (allModules.isNotEmpty
-                                        ? allModules.length
-                                        : 1),
+                                value: min(
+                                  completed.length /
+                                      (allModules.isNotEmpty
+                                          ? allModules.length
+                                          : 1),
+                                  1.0,
+                                ),
                                 backgroundColor: Colors.white.withOpacity(0.5),
                                 color: Colors.green,
                               ),
@@ -494,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen>
                               border: Border.all(color: Colors.green.shade200),
                             ),
                             child: Text(
-                              "${completed.length}/${allModules.length} completed",
+                              "${min(completed.length, allModules.length)}/${allModules.length} completed",
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.green.shade700,

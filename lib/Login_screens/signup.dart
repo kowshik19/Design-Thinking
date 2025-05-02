@@ -186,7 +186,7 @@ class _SignupState extends State<Signup> {
                   GestureDetector(
                     onTap: _pickImage,
                     child: CircleAvatar(
-                      radius: 60,
+                      radius: 50,
                       backgroundImage:
                           _profileImage != null
                               ? FileImage(_profileImage!)
@@ -197,7 +197,7 @@ class _SignupState extends State<Signup> {
                       child:
                           _profileImage == null
                               ? const Icon(
-                                Icons.camera_alt,
+                                Icons.add_a_photo,
                                 size: 30,
                                 color: Colors.white,
                               )
@@ -209,7 +209,7 @@ class _SignupState extends State<Signup> {
 
                   SizedBox(height: screenHeight * 0.02),
                   const Text(
-                    'Hey Champ👋,\nLet’s Create Your Account ',
+                    'Hey Champ👋,\nLets Create Your Account ',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
                     textAlign: TextAlign.center,
                   ),
