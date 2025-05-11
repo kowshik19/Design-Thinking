@@ -568,30 +568,7 @@ class _QuizQuestionPageState extends State<QuizQuestionPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const CertificateGenerator(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.card_membership, color: Colors.white),
-                            label: const Text(
-                              "View Certificates",
-                              style: TextStyle(fontSize: 16, color: Colors.white),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 15,
-                                vertical: 10,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
+                         
                           ElevatedButton.icon(
                             onPressed: _goToHome,
                             icon: const Icon(Icons.home, color: Colors.white),

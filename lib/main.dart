@@ -6,11 +6,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -19,9 +19,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      theme: ThemeData(textTheme: GoogleFonts.poppinsTextTheme()),
+      title: 'Design Thinking',
+      theme: ThemeData(
+        textTheme: GoogleFonts.poppinsTextTheme(),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
       debugShowCheckedModeBanner: false,
-      home: SplashScreen(),
+      home: const SplashScreen(),
     );
   }
 }
@@ -37,13 +42,18 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    _navigateToHome();
+  }
 
-    Timer(Duration(seconds: 3), () {
+  Future<void> _navigateToHome() async {
+    await Future.delayed(const Duration(seconds: 3));
+
+    if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => AuthGate()),
+        MaterialPageRoute(builder: (context) => const AuthGate()),
       );
-    });
+    }
   }
 
   @override

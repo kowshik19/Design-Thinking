@@ -32,26 +32,41 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    
     setState(() {
       isLoading = true;
     });
 
-    // First fetch user data and modules
-    await Future.wait([fetchUserData(), fetchModules()]);
+    try {
+      // First fetch user data and modules
+      await Future.wait([fetchUserData(), fetchModules()]);
 
-    // Then fetch ongoing and completed modules (which depend on allModules)
-    await Future.wait([fetchOngoingModules(), fetchCompletedModules()]);
-
-    setState(() {
-      isLoading = false;
-    });
+      // Then fetch ongoing and completed modules (which depend on allModules)
+      await Future.wait([fetchOngoingModules(), fetchCompletedModules()]);
+    } catch (e) {
+      print("Error loading data: $e");
+      // You might want to add some error state handling here
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> fetchUserData() async {
     try {
-      String uid = FirebaseAuth.instance.currentUser!.uid;
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+      
+      String uid = currentUser.uid;
       DocumentSnapshot userDoc =
           await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      
+      if (!mounted) return;
+      
       if (userDoc.exists) {
         setState(() {
           String firstName = userDoc['firstName'] ?? 'First';
@@ -70,7 +85,10 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> fetchModules() async {
     try {
       QuerySnapshot snapshot =
-          await FirebaseFirestore.instance.collection('module').get();
+          await FirebaseFirestore.instance
+              .collection('module')
+              .orderBy('createdAt', descending: false)
+              .get();
 
       setState(() {
         allModules =
@@ -82,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen>
                 "duration": data['duration'] ?? '',
                 "image": data['imageUrl'] ?? 'assets/images/ob_img3.png',
                 "lessonsStatus": data['lessonsStatus'] ?? [],
+                "createdAt": data['createdAt'],
               };
             }).toList();
       });
@@ -154,8 +173,36 @@ class _HomeScreenState extends State<HomeScreen>
           "Found ${completed.length} completed modules out of ${allModules.length}: $completed",
         );
       });
+
+      // Update overall mastery in Firebase
+      await updateOverallMastery(
+        uid,
+        validCompletedModules.length,
+        allModules.length,
+      );
     } catch (e) {
       print("Completed fetch error: $e");
+    }
+  }
+
+  // Function to update overall mastery in Firebase
+  Future<void> updateOverallMastery(
+    String uid,
+    int completedCount,
+    int totalModules,
+  ) async {
+    try {
+      double masteryPercentage =
+          min((completedCount / (totalModules > 0 ? totalModules : 1)), 1.0) *
+          100;
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'overallMastery': masteryPercentage,
+      });
+
+      print("Overall mastery updated: $masteryPercentage%");
+    } catch (e) {
+      print("Error updating overall mastery: $e");
     }
   }
 
@@ -164,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen>
     int totalLessons = 0;
     int completedLessons = 0;
 
-    allModules.forEach((module) {
+    for (var module in allModules) {
       if (module['title'] == moduleTitle) {
         totalLessons = module['lessonsStatus'].length;
         completedLessons =
@@ -172,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen>
                 .where((lessonStatus) => lessonStatus['isCompleted'] == true)
                 .length;
       }
-    });
+    }
 
     if (totalLessons == 0) return 0.0;
 
@@ -349,277 +396,277 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 20),
-                  child: Column(
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Image.asset(
-                            'assets/splashscreen_img_1.png',
-                            scale: 3,
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                'Welcome 👋',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                userName,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-
-                              const SizedBox(width: 10),
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.blue.shade100,
-                                    width: 2,
-                                  ),
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: CircleAvatar(
-                                  radius: 20,
-                                  backgroundImage:
-                                      profileImageUrl.isNotEmpty
-                                          ? NetworkImage(profileImageUrl)
-                                          : const AssetImage(
-                                              'assets/HomeScreen_Profile.png',
-                                            ) as ImageProvider<Object>,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      // Banner Image
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.asset(
-                          'assets/HomeScreen_banner.png',
-                          fit: BoxFit.cover,
-                          width: double.infinity,
+      body: SafeArea(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.only(left: 20, right: 20),
+                child: Column(
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Image.asset(
+                          'assets/splashscreen_img_1.png',
+                          scale: 3,
                         ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Mastery Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xffA8E8F9),
-                              Colors.blue.shade100,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blue.shade100.withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "Overall Mastery",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      "Unlock your greatness",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    '${(min((completed.length / (allModules.isNotEmpty ? allModules.length : 1)), 1.0) * 100).toInt()}%',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              'Welcome 👋',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black,
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: LinearProgressIndicator(
-                                minHeight: 10,
-                                value: min(
-                                  completed.length /
-                                      (allModules.isNotEmpty
-                                          ? allModules.length
-                                          : 1),
-                                  1.0,
+                            const SizedBox(width: 10),
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+
+                            const SizedBox(width: 10),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.blue.shade100,
+                                  width: 2,
                                 ),
-                                backgroundColor: Colors.white.withOpacity(0.5),
-                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: CircleAvatar(
+                                radius: 20,
+                                backgroundImage:
+                                    profileImageUrl.isNotEmpty
+                                        ? NetworkImage(profileImageUrl)
+                                        : const AssetImage(
+                                              'assets/HomeScreen_Profile.png',
+                                            )
+                                            as ImageProvider<Object>,
                               ),
                             ),
                           ],
                         ),
+                      ],
+                    ),
+
+                    // Banner Image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/HomeScreen_banner.png',
+                        fit: BoxFit.cover,
+                        width: double.infinity,
                       ),
+                    ),
 
-                      const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                      // Tab section
-                      Row(
-                        children: [
-                          const Text(
-                            "Let's Start",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    // Mastery Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xffA8E8F9),
+                            Colors.blue.shade100,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.shade100.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
                           ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.green.shade200),
-                            ),
-                            child: Text(
-                              "${min(completed.length, allModules.length)}/${allModules.length} completed",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.bold,
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Overall Mastery",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Unlock your greatness",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
                               ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${(min((completed.length / (allModules.length > 0 ? allModules.length : 1)), 1.0) * 100).toInt()}%',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              minHeight: 10,
+                              value: min(
+                                completed.length /
+                                    (allModules.length > 0
+                                        ? allModules.length
+                                        : 1),
+                                1.0,
+                              ),
+                              backgroundColor: Colors.white.withOpacity(0.5),
+                              color: Colors.green,
                             ),
                           ),
                         ],
                       ),
+                    ),
 
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 20),
 
-                      // Tab bar
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                    // Tab section
+                    Row(
+                      children: [
+                        const Text(
+                          "Let's Start",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Text(
+                            "${min(completed.length, allModules.length)}/${allModules.length} completed",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Tab bar
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicator: BoxDecoration(
+                          color: Colors.red.shade100,
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        child: TabBar(
-                          controller: _tabController,
-                          indicator: BoxDecoration(
-                            color: Colors.red.shade100,
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          labelPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          indicatorColor: Colors.transparent,
-                          labelColor: Colors.red.shade900,
-                          unselectedLabelColor: Colors.grey.shade700,
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          dividerColor: Colors.transparent,
-                          tabs: const [
-                            Tab(text: "Modules"),
-                            Tab(text: "Ongoing"),
-                            Tab(text: "Completed"),
-                          ],
+                        labelPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
                         ),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Tab view
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildLessonList(
-                              allModules,
-                              onTap: (title) {
-                                widget.onModuleTap(title);
-                              },
-                            ),
-                            // In TabBarView > children:
-                            _buildLessonList(
-                              allModules
-                                  .where(
-                                    (module) =>
-                                        ongoing.contains(module['title']),
-                                  )
-                                  .toList(),
-                              actionIcon: Icons.play_circle_fill,
-                              iconColor: Colors.orange,
-                              onTap: (title) {
-                                widget.onModuleTap(title);
-                              },
-                            ),
-                            _buildLessonList(
-                              allModules
-                                  .where(
-                                    (module) =>
-                                        completed.contains(module['title']),
-                                  )
-                                  .toList(),
-                              actionIcon: Icons.check_circle,
-                              iconColor: Colors.green,
-                              onTap: (title) {
-                                widget.onModuleTap(title);
-                              },
-                            ),
-                          ],
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicatorColor: Colors.transparent,
+                        labelColor: Colors.red.shade900,
+                        unselectedLabelColor: Colors.grey.shade700,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
                         ),
+                        dividerColor: Colors.transparent,
+                        tabs: const [
+                          Tab(text: "Modules"),
+                          Tab(text: "Ongoing"),
+                          Tab(text: "Completed"),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Tab view
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildLessonList(
+                            allModules,
+                            onTap: (title) {
+                              widget.onModuleTap(title);
+                            },
+                          ),
+                          // In TabBarView > children:
+                          _buildLessonList(
+                            allModules
+                                .where(
+                                  (module) =>
+                                      ongoing.contains(module['title']),
+                                )
+                                .toList(),
+                            actionIcon: Icons.play_circle_fill,
+                            iconColor: Colors.orange,
+                            onTap: (title) {
+                              widget.onModuleTap(title);
+                            },
+                          ),
+                          _buildLessonList(
+                            allModules
+                                .where(
+                                  (module) =>
+                                      completed.contains(module['title']),
+                                )
+                                .toList(),
+                            actionIcon: Icons.check_circle,
+                            iconColor: Colors.green,
+                            onTap: (title) {
+                              widget.onModuleTap(title);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
+      ),
     );
   }
 }
